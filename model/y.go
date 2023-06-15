@@ -30,3 +30,10 @@ func createRelativePositionFromTypeIndex(ytext string, ty int) {
 func createAbsolutePositionFromRelativePosition() {
 
 }
+
+func (*Y[K, V]) writeDeleteSet(e encoder) {
+
+}
+func (*Y[K, V]) toBinary() encoder {
+	return nil
+}
