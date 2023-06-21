@@ -19,7 +19,7 @@ func (*Y[K, V]) writeStateSet(e encoder) {
 	// encoder.writeUint32(0)
 	// for (let[user, clock]
 	// 	of
-	// y.ss.state) {
+	// y.go.ss.state) {
 	// 	encoder.writeVarUint(user)
 	// 	encoder.writeVarUint(clock)
 	// 	len++

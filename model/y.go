@@ -4,6 +4,7 @@ type AbstractConnector interface {
 }
 
 type AbstractPersistence interface {
+	a()
 }
 
 type Y[K string, V any] struct {
