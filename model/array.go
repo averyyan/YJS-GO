@@ -1,5 +1,7 @@
 package model
 
+import "YJS-GO/types"
+
 // parent:Y.AbstractType|null
 // insert(index:number, content:Array<object|boolean|Array|string|number|null|Uint8Array|Y.Type>)
 // 在索引 处插入内容。请注意，内容是一个元素数组。即array.insert(0, [1])拼接list，在0位置插入1。
@@ -32,7 +34,7 @@ package model
 // observeDeep从此类型中 删除事件侦听器。
 
 type YArray struct {
-	parent AbstractType
+	parent types.AbstractType
 }
 
 type YArrayEvent struct {
@@ -69,7 +71,7 @@ func (*YArray) length() int {
 
 // forEach(function(value:object|boolean|Array|string|number|null|Uint8Array|Y.Type,
 // index int, array: Y.Array))
-func (*YArray) forEach(f func(abstractType AbstractType), index int) int {
+func (*YArray) forEach(f func(abstractType types.AbstractType), index int) int {
 	return 0
 }
 

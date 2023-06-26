@@ -1,8 +1,10 @@
 package model
 
+import "YJS-GO/types"
+
 type YDoc struct {
 	text  Text
-	array Array[string, AbstractType]
+	array Array[string, types.AbstractType]
 }
 
 type Text string

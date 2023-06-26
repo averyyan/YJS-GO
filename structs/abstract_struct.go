@@ -13,12 +13,8 @@ type AbstractStruct struct {
 
 type IAbstractStruct interface {
 	MergeWith(AbstractStruct)
-
 	Delete(model.Transaction)
-
 	Integrate(transaction model.Transaction, offset int)
-
 	GetMissing(transaction model.Transaction, store utils.StructStore)
-
 	Write(encoder utils.IUpdateEncoder, offset int)
 }
