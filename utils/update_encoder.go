@@ -1,9 +1,12 @@
 package utils
 
-import "io"
+import (
+	"bufio"
+	"io"
+)
 
 type IDSEncoder interface {
-	RestWriter() io.ByteWriter
+	RestWriter() *bufio.ReadWriter
 
 	ToArray() []byte
 	WriteDsLength(length uint)
@@ -13,7 +16,7 @@ type IDSEncoder interface {
 
 type IUpdateEncoder interface {
 	IDSEncoder
-	Writer() io.ByteWriter
+	Writer() io.Writer
 
 	WriteLeftId(id ID)
 	WriteRightId(id ID)

@@ -7,7 +7,7 @@ import (
 
 type AbstractStruct struct {
 	Id      utils.ID
-	length  int
+	Length  int
 	Deleted bool
 }
 

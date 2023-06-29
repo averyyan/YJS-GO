@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"container/list"
+	"encoding/binary"
 	"errors"
 
 	"YJS-GO/lib0"
@@ -43,4 +45,51 @@ func ReadItemContent(decoder IUpdateDecoder, info byte) (structs.IContent, error
 		return content.ReadDoc(decoder)
 	}
 	return nil, errors.New("dont implement type")
+}
+
+//    public static void WriteStateVector(IDSEncoder encoder, IDictionary<long, long> sv)
+//        {
+//            encoder.RestWriter.WriteVarUint((uint)sv.Count);
+//
+//            foreach (var kvp in sv)
+//            {
+//                var Client = kvp.Key;
+//                var Clock = kvp.Value;
+//
+//                encoder.RestWriter.WriteVarUint((uint)Client);
+//                encoder.RestWriter.WriteVarUint((uint)Clock);
+//            }
+//        }
+
+func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
+	binary.Write(encoder.RestWriter(), binary.LittleEndian, len(sv))
+	for k, v := range sv {
+		binary.Write(encoder.RestWriter(), binary.LittleEndian, k)
+		binary.Write(encoder.RestWriter(), binary.LittleEndian, v)
+	}
+}
+
+// / <summary>
+// / Read the next Item in a Decoder and fill this Item with the read data.
+// / <br/>
+// / This is called when data is received from a remote peer.
+// / </summary>
+// public static void ReadStructs(IUpdateDecoder decoder, Transaction transaction, StructStore store)
+// {
+// var clientStructRefs = ReadClientStructRefs(decoder, transaction.Doc);
+// store.MergeReadStructsIntoPendingReads(clientStructRefs);
+// store.ResumeStructIntegration(transaction);
+// store.CleanupPendingStructs();
+// store.TryResumePendingDeleteReaders(transaction);
+// }
+func ReadStructs(decoder IUpdateDecoder, transaction Transaction, store StructStore) {
+	var clientStructRefs = ReadClientStructRefs(decoder, transaction.Doc)
+	store.MergeReadStructsIntoPendingReads(clientStructRefs)
+	store.ResumeStructIntegration(transaction)
+	store.CleanupPendingStructs()
+	store.TryResumePendingDeleteReaders(transaction)
+}
+
+func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
+	return nil
 }

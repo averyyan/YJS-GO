@@ -3,12 +3,7 @@ package utils
 import "io"
 
 type IUpdateDecoder interface {
-	Reader() io.ByteReader
-	// parent interface
-	ReadDsLength()
-	ReadDsClock()
-	ResetDsCurVal()
-	// self interface
+	IDSDecoder
 	ReadLeftId() ID
 	ReadRightId() ID
 	ReadClient() int64
@@ -21,4 +16,11 @@ type IUpdateDecoder interface {
 	ReadBuffer() []byte
 	ReadKey() string
 	ReadJson() any
+}
+
+type IDSDecoder interface {
+	Reader() io.Reader
+	ReadDsLength()
+	ReadDsClock()
+	ResetDsCurVal()
 }

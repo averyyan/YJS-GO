@@ -6,17 +6,17 @@ import (
 )
 
 type ID struct {
-	client uint64
-	clock  uint64
+	Client uint64
+	Clock  uint64
 }
 
 func (a *ID) EQ(b *ID) bool {
-	return a == b || (a.client == b.client && a.clock == b.clock)
+	return a == b || (a.Client == b.Client && a.Clock == b.Clock)
 }
 
 func (a *ID) writeID(buffer []byte) {
-	binary.AppendUvarint(buffer, a.client)
-	binary.AppendUvarint(buffer, a.clock)
+	binary.AppendUvarint(buffer, a.Client)
+	binary.AppendUvarint(buffer, a.Clock)
 }
 
 func ReadID(reader io.ByteReader) *ID {
@@ -29,7 +29,7 @@ func ReadID(reader io.ByteReader) *ID {
 		return nil
 	}
 	return &ID{
-		client: client,
-		clock:  clock,
+		Client: client,
+		Clock:  clock,
 	}
 }
