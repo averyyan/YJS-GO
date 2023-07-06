@@ -14,6 +14,10 @@ func (a *ID) EQ(b *ID) bool {
 	return a == b || (a.Client == b.Client && a.Clock == b.Clock)
 }
 
+func EQ(a *ID, b *ID) bool {
+	return a == b || (a.Client == b.Client && a.Clock == b.Clock)
+}
+
 func (a *ID) writeID(buffer []byte) {
 	binary.AppendUvarint(buffer, a.Client)
 	binary.AppendUvarint(buffer, a.Clock)

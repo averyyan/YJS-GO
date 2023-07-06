@@ -9,7 +9,7 @@ import (
 type IContent interface {
 	Copy() IContent
 	Splice(offset int) IContent
-	MergeWith(right IContent)
+	MergeWith(right IContent) bool
 	GetContent() list.List
 	GetLength() int
 	Countable() bool
@@ -22,4 +22,5 @@ type IContentExt interface {
 	Delete(transaction utils.Transaction)
 	Integrate(transaction utils.Transaction, item Item)
 	GetRef() int
+	GetType() bool
 }

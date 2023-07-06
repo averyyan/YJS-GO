@@ -37,6 +37,13 @@ func (d YdocOptions) Clone() *YdocOptions {
 	}
 }
 
+func NewDoc() *YDoc {
+	return &YDoc{
+		GC:     false,
+		Filter: GCFilter{},
+	}
+}
+
 func (d YDoc) EncodeStateVectorV2() []byte {
 	var encoder = new(DSEncoderV2)
 	writeStateVector(encoder)

@@ -4,6 +4,7 @@ import (
 	"container/list"
 
 	"YJS-GO/structs"
+	"YJS-GO/types"
 )
 
 const (
@@ -33,5 +34,14 @@ type ChangeKey struct {
 	OldValue interface{}
 }
 
+type NewBaseType struct {
+	changes       ChangesCollection
+	Target        types.AbstractType
+	CurrentTarget types.AbstractType
+	Transaction   Transaction
+	Path          []any
+}
+
 type YEvent struct {
+	NewBaseType
 }
