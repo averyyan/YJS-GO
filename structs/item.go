@@ -19,14 +19,15 @@ type InfoEnum int
 var _ IAbstractStruct = (*Item)(nil)
 
 type Item struct {
-	AbstractStruct
-
+	Id          utils.ID
+	Length      uint64
+	Deleted     bool
 	Info        InfoEnum
 	LeftOrigin  *utils.ID
 	Left        any // AbstractStruct
 	RightOrigin *utils.ID
 	Right       any // AbstractStruct
-	Parent      any
+	Parent      any // Object
 	// If the parent refers to this item with some kind of key (e.g. YMap).
 	// The key is then used to refer to the list in which to insert this item.
 	// If 'parentSub = null', type._start is the list in which to insert to.
@@ -37,20 +38,31 @@ type Item struct {
 	Marker    bool
 	Keep      bool
 	Countable bool
-	Deleted   bool
 	LastId    *utils.ID
 	Next      any // AbstractStruct
 	Prev      any // AbstractStruct
 }
 
-// func (i *Item) MergeWith(right AbstractStruct) bool {
+func (i *Item) GetLength() uint {
+	return uint(i.Length)
+}
+
+func (i *Item) GetDeleted() bool {
+	return i.Deleted
+}
+
+func (i *Item) ID() utils.ID {
+	return i.Id
+}
+
+// MergeWith func (i *Item) MergeWith(right AbstractStruct) bool {
 func (i *Item) MergeWith(right any) bool {
 	var rightItem = i.Right.(*Item)
 	if utils.EQ(rightItem.LeftOrigin, i.LastId) &&
 		i.Right == right &&
 		utils.EQ(rightItem.RightOrigin, i.RightOrigin) &&
 		i.Id.Client == right.(*Item).Id.Client &&
-		i.Id.Clock+uint64(i.AbstractStruct.Length) == right.(*Item).Id.Clock &&
+		i.Id.Clock+i.Length == right.(*Item).Id.Clock &&
 		i.Deleted == right.(*Item).Deleted &&
 		i.Redone == nil &&
 		reflect.TypeOf(i.Content) == reflect.TypeOf(rightItem.Content) &&

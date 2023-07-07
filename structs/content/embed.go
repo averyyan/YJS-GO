@@ -27,7 +27,7 @@ func (e Embed) Splice(offset int) structs.IContent {
 	panic("implement me")
 }
 
-func (e Embed) MergeWith(right structs.IContent) {
+func (e Embed) MergeWith(right structs.IContent) bool {
 	// TODO implement me
 	panic("implement me")
 }

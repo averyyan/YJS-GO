@@ -12,6 +12,11 @@ var _ structs.IContentExt = (*Deleted)(nil)
 type Deleted struct {
 }
 
+func (d Deleted) MergeWith(right structs.IContent) bool {
+	// TODO implement me
+	panic("implement me")
+}
+
 func ReadDeleted(decoder utils.IUpdateDecoder) (Deleted, error) {
 	// TODO implement me
 	panic("implement me")
@@ -23,11 +28,6 @@ func (d Deleted) Copy() structs.IContent {
 }
 
 func (d Deleted) Splice(offset int) structs.IContent {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (d Deleted) MergeWith(right structs.IContent) {
 	// TODO implement me
 	panic("implement me")
 }

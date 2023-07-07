@@ -1,6 +1,8 @@
 package utils
 
-import "io"
+import (
+	"bufio"
+)
 
 type IUpdateDecoder interface {
 	IDSDecoder
@@ -19,7 +21,7 @@ type IUpdateDecoder interface {
 }
 
 type IDSDecoder interface {
-	Reader() io.Reader
+	Reader() *bufio.Reader
 	ReadDsLength()
 	ReadDsClock()
 	ResetDsCurVal()

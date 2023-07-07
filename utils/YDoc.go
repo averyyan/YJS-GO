@@ -11,6 +11,7 @@ import (
 type YDoc struct {
 	GC     bool
 	Filter GCFilter
+	Store  *StructStore
 }
 
 type GCFilter struct {
@@ -50,8 +51,25 @@ func (d YDoc) EncodeStateVectorV2() []byte {
 	return encoder.ToArray()
 }
 
-func (d YDoc) EncodeStateAsUpdateV2(b []byte) []byte {
-	return b
+// EncodeStateAsUpdateV2 Write all the document as a single update message that can be applied on the remote document.
+// If you specify the state of the remote client, it will only write the operations that are missing.
+// Use 'WriteStateAsUpdate' instead if you are working with Encoder.
+func (d YDoc) EncodeStateAsUpdateV2(encodedTargetStateVector []byte) []byte {
+	var encoder = NewUpdateEncoderV2()
+	var targetStateVector = map[uint64]uint64{}
+	if encodedTargetStateVector != nil {
+		targetStateVector = DecodeStateVector(bytes.NewReader(encodedTargetStateVector))
+	}
+	d.WriteStateAsUpdate(encoder, targetStateVector)
+	return encoder.ToArray()
+}
+
+// WriteStateAsUpdate Write all the document as a single update message.
+// If you specify the satte of the remote client, it will only
+// write the operations that are missing.
+func (d YDoc) WriteStateAsUpdate(encoder IUpdateEncoder, targetStateVector map[uint64]uint64) {
+	WriteClientsStructs(encoder, d.Store, targetStateVector)
+	NewDeleteSet(d.Store).Write(encoder)
 }
 
 func (d YDoc) ApplyUpdateV2(vector []byte, origin interface{}) {
@@ -60,7 +78,7 @@ func (d YDoc) ApplyUpdateV2(vector []byte, origin interface{}) {
 
 func (d YDoc) ApplyUpdateV2WithReader(reader io.Reader, origin interface{}) {
 	var fun = func(tr Transaction) {
-		var structDecoder = UpdateDecoderV2{}
+		var structDecoder = NewUpdateDecoderV2()
 		ReadStructs(structDecoder, tr, Store)
 	}
 	Transact(fun, origin, false)

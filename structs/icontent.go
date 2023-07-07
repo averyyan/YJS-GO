@@ -22,5 +22,5 @@ type IContentExt interface {
 	Delete(transaction utils.Transaction)
 	Integrate(transaction utils.Transaction, item Item)
 	GetRef() int
-	GetType() bool
+	// GetType() bool
 }

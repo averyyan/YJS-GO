@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"encoding/binary"
 	"errors"
+	"io"
+	"sort"
 
 	"YJS-GO/lib0"
 	"YJS-GO/structs"
@@ -92,4 +94,89 @@ func ReadStructs(decoder IUpdateDecoder, transaction Transaction, store StructSt
 
 func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
 	return nil
+}
+
+func ReadStateVector(decoder IDSDecoder) map[uint64]uint64 {
+	ssLength, err := binary.ReadUvarint(decoder.Reader())
+	if err != nil {
+		return nil
+	}
+	var ss = make(map[uint64]uint64, ssLength)
+	for i := 0; i < int(ssLength); i++ {
+		client, err := binary.ReadUvarint(decoder.Reader())
+		if err != nil {
+			continue
+		}
+		clock, err := binary.ReadUvarint(decoder.Reader())
+		if err != nil {
+			continue
+		}
+		ss[client] = clock
+	}
+
+	return ss
+}
+
+func DecodeStateVector(input io.Reader) map[uint64]uint64 {
+	return ReadStateVector(NewDsDecoderV2(input))
+}
+
+func WriteClientsStructs(encoder IUpdateEncoder, store *StructStore, _sm map[uint64]uint64) {
+	// We filter all valid _sm entries into sm.
+	var sm map[uint64]uint64
+
+	for client, clock := range _sm {
+		// Only write if new structs are available.
+		if store.GetState(client) > clock {
+			sm[client] = clock
+		}
+	}
+
+	for client, _ := range store.GetStateVector() {
+		if _, ok := sm[client]; !ok {
+			sm[client] = 0
+		}
+	}
+	// Write # states that were updated.
+	binary.Write(encoder.RestWriter(), binary.LittleEndian, uint(len(sm)))
+	// Write items with higher client ids first.
+	// This heavily improves the conflict resolution algorithm.
+
+	sortedClients := sortClients(sm)
+
+	for _, client := range sortedClients {
+		WriteStructs(encoder, store.Clients[client], client, sm[client])
+	}
+
+	encoder.RestWriter()
+}
+
+func WriteStructs(encoder IUpdateEncoder, structs []structs.IAbstractStruct, client, clock uint64) {
+	// Write first id.
+	startNewStructs := FindIndexSS(structs, clock)
+
+	// Write # encoded structs.
+	binary.Write(encoder.RestWriter(), binary.LittleEndian, uint(len(structs))-startNewStructs)
+	encoder.WriteClient(client)
+	binary.Write(encoder.RestWriter(), binary.LittleEndian, uint(clock))
+
+	// Write first struct with offset.
+	var firstStruct = structs[startNewStructs]
+	firstStruct.Write(encoder, (int)(clock-firstStruct.ID().Clock))
+
+	for i := startNewStructs + 1; i < uint(len(structs)); i++ {
+		structs[i].Write(encoder, 0)
+	}
+}
+
+func sortClients(sm map[uint64]uint64) []uint64 {
+	var a []uint64
+	for _, u := range sm {
+		a = append(a, u)
+	}
+	sort.SliceStable(a, func(i, j int) bool {
+		return a[i] < a[j]
+	})
+
+	return a
 }

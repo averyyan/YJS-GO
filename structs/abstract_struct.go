@@ -6,7 +6,7 @@ import (
 
 type AbstractStruct struct {
 	Id      utils.ID
-	Length  int
+	Length  uint64
 	Deleted bool
 }
 
@@ -16,4 +16,7 @@ type IAbstractStruct interface {
 	Integrate(transaction utils.Transaction, offset int)
 	GetMissing(transaction utils.Transaction, store utils.StructStore)
 	Write(encoder utils.IUpdateEncoder, offset int)
+	ID() utils.ID
+	GetLength() uint
+	GetDeleted() bool
 }

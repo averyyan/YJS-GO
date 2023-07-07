@@ -27,7 +27,7 @@ func (j Json) Splice(offset int) structs.IContent {
 	panic("implement me")
 }
 
-func (j Json) MergeWith(right structs.IContent) {
+func (j Json) MergeWith(right structs.IContent) bool {
 	// TODO implement me
 	panic("implement me")
 }

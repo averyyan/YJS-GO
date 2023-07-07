@@ -27,7 +27,7 @@ func (b Binary) Splice(offset int) structs.IContent {
 	panic("implement me")
 }
 
-func (b Binary) MergeWith(right structs.IContent) {
+func (b Binary) MergeWith(right structs.IContent) bool {
 	// TODO implement me
 	panic("implement me")
 }

@@ -17,7 +17,7 @@ type AbstractType struct {
 
 	Doc    *utils.YDoc
 	Parent *AbstractType
-	Length int
+	Length uint64
 }
 
 func (at AbstractType) Integrate(doc *utils.YDoc, item *structs.Item) {

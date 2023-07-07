@@ -2,27 +2,26 @@ package utils
 
 import (
 	"bufio"
-	"io"
 )
 
 type IDSEncoder interface {
 	RestWriter() *bufio.ReadWriter
 
 	ToArray() []byte
-	WriteDsLength(length uint)
-	WriteDsClock(clock uint)
+	WriteDsLength(length uint64)
+	WriteDsClock(clock uint64)
 	ResetDsCurVal()
 }
 
 type IUpdateEncoder interface {
 	IDSEncoder
-	Writer() io.Writer
+	Writer() *bufio.Writer
 
 	WriteLeftId(id ID)
 	WriteRightId(id ID)
 
 	// WriteClient NOTE: Use 'writeClient' and 'writeClock' instead of writeID if possible.
-	WriteClient(client int64)
+	WriteClient(client uint64)
 	WriteInfo(info byte)
 	WriteString(s string)
 	WriteParentInfo(isYKey bool)
