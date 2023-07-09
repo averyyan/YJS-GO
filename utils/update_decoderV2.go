@@ -100,6 +100,6 @@ func (u *UpdateDecoderV2) ReadJson() any {
 	panic("implement me")
 }
 
-func NewUpdateDecoderV2() *UpdateDecoderV2 {
+func NewUpdateDecoderV2(reader io.Reader) *UpdateDecoderV2 {
 	return &UpdateDecoderV2{}
 }

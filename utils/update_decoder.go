@@ -6,9 +6,9 @@ import (
 
 type IUpdateDecoder interface {
 	IDSDecoder
-	ReadLeftId() ID
-	ReadRightId() ID
-	ReadClient() int64
+	ReadLeftId() *ID
+	ReadRightId() *ID
+	ReadClient() uint64
 	ReadInfo() byte
 	ReadString() string
 	ReadParentInfo() bool

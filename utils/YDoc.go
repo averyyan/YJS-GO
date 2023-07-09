@@ -78,7 +78,7 @@ func (d YDoc) ApplyUpdateV2(vector []byte, origin interface{}) {
 
 func (d YDoc) ApplyUpdateV2WithReader(reader io.Reader, origin interface{}) {
 	var fun = func(tr Transaction) {
-		var structDecoder = NewUpdateDecoderV2()
+		var structDecoder = NewUpdateDecoderV2(reader)
 		ReadStructs(structDecoder, tr, Store)
 	}
 	Transact(fun, origin, false)

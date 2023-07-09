@@ -93,6 +93,138 @@ func ReadStructs(decoder IUpdateDecoder, transaction Transaction, store StructSt
 }
 
 func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
+	// var clientRefs = new Dictionary<long, List<AbstractStruct>>();
+	// var numOfStateUpdates = decoder.Reader.ReadVarUint();
+	var clientRefs = map[uint64][]structs.IAbstractStruct{}
+	numOfStateUpdates, err := binary.ReadUvarint(decoder.Reader())
+	if err != nil {
+		return nil
+	}
+	for i := 0; i < int(numOfStateUpdates); i++ {
+		numberOfStructs, err := binary.ReadUvarint(decoder.Reader())
+		if err != nil {
+			return nil
+		}
+		var refs = make([]structs.IAbstractStruct, numberOfStructs)
+		var client = decoder.ReadClient()
+		clock, err := binary.ReadUvarint(decoder.Reader())
+		if err != nil {
+			return nil
+		}
+		clientRefs[client] = refs
+		for i := 0; i < int(numberOfStructs); i++ {
+			var info = decoder.ReadInfo()
+			if lib0.Bits5&uint(info) != 0 {
+				var (
+					leftOrigin    *ID
+					rightOrigin   *ID
+					hasParentYKey bool
+				)
+				// The item that was originally to the left of this item.
+				if (uint(info) & lib0.Bit8) == lib0.Bit8 {
+					leftOrigin = decoder.ReadLeftId()
+				}
+				// The item that was originally to the right of this item.
+
+				if (uint(info) & lib0.Bit7) == lib0.Bit7 {
+					leftOrigin = decoder.ReadRightId()
+				}
+				var cantCopyParentInfo = (uint(info) & (lib0.Bit7 | lib0.Bit8)) == 0
+				if cantCopyParentInfo {
+					hasParentYKey = decoder.ReadParentInfo()
+				}
+				// If parent == null and neither left nor right are defined, then we know that 'parent' is child of 'y'
+				// and we read the next string as parentYKey.
+				// It indicates how we store/retrieve parent from 'y.share'.
+				var parentYKey = cantCopyParentuint(info) && hasParentYKey ? decoder.ReadString() : null
+
+				var str = &structs.Item{
+					Id: &ID{
+						Client: client,
+						Clock:  clock,
+					},
+					Length:      0,
+					Deleted:     false,
+					Info:        0,
+					LeftOrigin:  nil,
+					Left:        nil,
+					RightOrigin: nil,
+					Right:       nil,
+					Parent:      nil,
+					ParentSub:   "",
+					Redone:      nil,
+					Content:     nil,
+					Marker:      false,
+					Keep:        false,
+					Countable:   false,
+					LastId:      nil,
+					Next:        nil,
+					Prev:        nil,
+				}
+				Item(
+					new
+				ID(client, clock),
+					null, // left
+					leftOrigin,
+					null,        // right
+					rightOrigin, // rightOrigin
+					cantCopyParentuint(info) && !hasParentYKey ? decoder.ReadLeftId() : (parentYKey != null ? (object)
+				doc.Get < AbstractType > (parentYKey) : null), // parent
+				cantCopyParentuint(info) && (info&lib0.Bit6) == lib0.Bit6 ? decoder.ReadString() : null, // parentSub
+					ReadItemContent(decoder, info) // content
+				)
+				refs = append(refs, str)
+				//                        clock += str.Length;
+
+			}
+		}
+		// 	var numberOfStructs = (int)decoder.Reader.ReadVarUint();
+		//                Debug.Assert(numberOfStructs >= 0);
+		//
+		//                var refs = new List<AbstractStruct>(numberOfStructs);
+		//                long client = decoder.ReadClient();
+		//                long clock = decoder.Reader.ReadVarUint();
+		//
+		//                clientRefs[client] = refs;
+		//
+		//                for (var j = 0; j < numberOfStructs; j++)
+		//                {
+		//                    var info = decoder.ReadInfo();
+		//                    if ((Bits.Bits5 & info) != 0)
+		//                    {
+		//                        // The item that was originally to the left of this item.
+		//                        var leftOrigin = (uint(info) & lib0.Bit8) == lib0.Bit8 ? (ID?)decoder.ReadLeftId() : null;
+		//                        // The item that was originally to the right of this item.
+		//                        var rightOrigin = (uint(info) & lib0.Bit7) == lib0.Bit7 ? (ID?)decoder.ReadRightId() : null;
+		//                        var cantCopyParentInfo = (uint(info) & (lib0.Bit7 | lib0.Bit8)) == 0;
+		//                        var hasParentYKey = cantCopyParentInfo ? decoder.ReadParentInfo() : false;
+		//
+		//                        // If parent == null and neither left nor right are defined, then we know that 'parent' is child of 'y'
+		//                        // and we read the next string as parentYKey.
+		//                        // It indicates how we store/retrieve parent from 'y.share'.
+		//                        var parentYKey = cantCopyParentuint(info) && hasParentYKey ? decoder.ReadString() : null;
+		//
+		//                        var str = new Item(
+		//                            new ID(client, clock),
+		//                            null, // left
+		//                            leftOrigin,
+		//                            null, // right
+		//                            rightOrigin, // rightOrigin
+		//                            cantCopyParentuint(info) && !hasParentYKey ? decoder.ReadLeftId() : (parentYKey != null ? (object)doc.Get<AbstractType>(parentYKey) : null), // parent
+		//                            cantCopyParentuint(info) && (uint(info) & lib0.Bit6) == lib0.Bit6 ? decoder.ReadString() : null, // parentSub
+		//                            ReadItemContent(decoder, info) // content
+		//                            );
+		//
+		//                        refs.Add(str);
+		//                        clock += str.Length;
+		//                    }
+		//                    else
+		//                    {
+		//                        var length = decoder.ReadLength();
+		//                        refs.Add(new GC(new ID(client, clock), length));
+		//                        clock += length;
+		//                    }
+	}
 	return nil
 }
 
