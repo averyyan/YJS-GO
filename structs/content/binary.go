@@ -22,7 +22,7 @@ func (b Binary) Copy() structs.IContent {
 	panic("implement me")
 }
 
-func (b Binary) Splice(offset int) structs.IContent {
+func (b Binary) Splice(offset uint64) structs.IContent {
 	// TODO implement me
 	panic("implement me")
 }
@@ -57,12 +57,12 @@ func (b Binary) Gc(store utils.StructStore) {
 	panic("implement me")
 }
 
-func (b Binary) Delete(transaction utils.Transaction) {
+func (b Binary) Delete(transaction *utils.Transaction) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (b Binary) Integrate(transaction utils.Transaction, item structs.Item) {
+func (b Binary) Integrate(transaction *utils.Transaction, item structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }

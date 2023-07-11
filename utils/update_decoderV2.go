@@ -15,12 +15,12 @@ func (d *DSDecoderV2) Reader() *bufio.Reader {
 	return d.reader
 }
 
-func (d *DSDecoderV2) ReadDsLength() {
+func (d *DSDecoderV2) ReadDsLength() uint64 {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (d *DSDecoderV2) ReadDsClock() {
+func (d *DSDecoderV2) ReadDsClock() uint64 {
 	// TODO implement me
 	panic("implement me")
 }
@@ -40,17 +40,17 @@ type UpdateDecoderV2 struct {
 	DSDecoderV2
 }
 
-func (u *UpdateDecoderV2) ReadLeftId() ID {
+func (u *UpdateDecoderV2) ReadLeftId() *ID {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (u *UpdateDecoderV2) ReadRightId() ID {
+func (u *UpdateDecoderV2) ReadRightId() *ID {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (u *UpdateDecoderV2) ReadClient() int64 {
+func (u *UpdateDecoderV2) ReadClient() uint64 {
 	// TODO implement me
 	panic("implement me")
 }
@@ -75,7 +75,7 @@ func (u *UpdateDecoderV2) ReadTypeRef() uint {
 	panic("implement me")
 }
 
-func (u *UpdateDecoderV2) ReadLength() int {
+func (u *UpdateDecoderV2) ReadLength() uint64 {
 	// TODO implement me
 	panic("implement me")
 }

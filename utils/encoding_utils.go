@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"container/list"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -49,20 +48,6 @@ func ReadItemContent(decoder IUpdateDecoder, info byte) (structs.IContent, error
 	return nil, errors.New("dont implement type")
 }
 
-//    public static void WriteStateVector(IDSEncoder encoder, IDictionary<long, long> sv)
-//        {
-//            encoder.RestWriter.WriteVarUint((uint)sv.Count);
-//
-//            foreach (var kvp in sv)
-//            {
-//                var Client = kvp.Key;
-//                var Clock = kvp.Value;
-//
-//                encoder.RestWriter.WriteVarUint((uint)Client);
-//                encoder.RestWriter.WriteVarUint((uint)Clock);
-//            }
-//        }
-
 func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
 	binary.Write(encoder.RestWriter(), binary.LittleEndian, len(sv))
 	for k, v := range sv {
@@ -71,12 +56,10 @@ func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
 	}
 }
 
-// / <summary>
-// / Read the next Item in a Decoder and fill this Item with the read data.
-// / <br/>
-// / This is called when data is received from a remote peer.
-// / </summary>
-// public static void ReadStructs(IUpdateDecoder decoder, Transaction transaction, StructStore store)
+// ReadStructs Read the next Item in a Decoder and fill this Item with the read data.
+// <br/>
+// This is called when data is received from a remote peer.
+// public static void ReadStructs(IUpdateDecoder decoder, transaction *Transaction, StructStore store)
 // {
 // var clientStructRefs = ReadClientStructRefs(decoder, transaction.Doc);
 // store.MergeReadStructsIntoPendingReads(clientStructRefs);
@@ -84,7 +67,7 @@ func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
 // store.CleanupPendingStructs();
 // store.TryResumePendingDeleteReaders(transaction);
 // }
-func ReadStructs(decoder IUpdateDecoder, transaction Transaction, store StructStore) {
+func ReadStructs(decoder IUpdateDecoder, transaction *Transaction, store StructStore) {
 	var clientStructRefs = ReadClientStructRefs(decoder, transaction.Doc)
 	store.MergeReadStructsIntoPendingReads(clientStructRefs)
 	store.ResumeStructIntegration(transaction)
@@ -92,9 +75,7 @@ func ReadStructs(decoder IUpdateDecoder, transaction Transaction, store StructSt
 	store.TryResumePendingDeleteReaders(transaction)
 }
 
-func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
-	// var clientRefs = new Dictionary<long, List<AbstractStruct>>();
-	// var numOfStateUpdates = decoder.Reader.ReadVarUint();
+func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[uint64][]structs.IAbstractStruct {
 	var clientRefs = map[uint64][]structs.IAbstractStruct{}
 	numOfStateUpdates, err := binary.ReadUvarint(decoder.Reader())
 	if err != nil {
@@ -125,7 +106,6 @@ func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
 					leftOrigin = decoder.ReadLeftId()
 				}
 				// The item that was originally to the right of this item.
-
 				if (uint(info) & lib0.Bit7) == lib0.Bit7 {
 					leftOrigin = decoder.ReadRightId()
 				}
@@ -136,96 +116,47 @@ func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[int]list.List {
 				// If parent == null and neither left nor right are defined, then we know that 'parent' is child of 'y'
 				// and we read the next string as parentYKey.
 				// It indicates how we store/retrieve parent from 'y.share'.
-				var parentYKey = cantCopyParentuint(info) && hasParentYKey ? decoder.ReadString() : null
+				var parentYKey string
+				if cantCopyParentInfo && hasParentYKey {
+					parentYKey = decoder.ReadString()
+				}
+				var parent interface{} = doc.Get(parentYKey)
+				if cantCopyParentInfo && !hasParentYKey {
+					parent = decoder.ReadLeftId()
+				}
+				content, _ := ReadItemContent(decoder, info)
 
+				var parentSub string
+				if cantCopyParentInfo && uint(info)&lib0.Bit6 == lib0.Bit6 {
+					parentSub = decoder.ReadString()
+				}
 				var str = &structs.Item{
 					Id: &ID{
 						Client: client,
 						Clock:  clock,
 					},
-					Length:      0,
-					Deleted:     false,
-					Info:        0,
-					LeftOrigin:  nil,
-					Left:        nil,
-					RightOrigin: nil,
-					Right:       nil,
-					Parent:      nil,
-					ParentSub:   "",
-					Redone:      nil,
-					Content:     nil,
-					Marker:      false,
-					Keep:        false,
-					Countable:   false,
-					LastId:      nil,
-					Next:        nil,
-					Prev:        nil,
+					LeftOrigin:  leftOrigin,
+					RightOrigin: rightOrigin,
+					Parent:      parent,
+					ParentSub:   parentSub,
+					Content:     content,
 				}
-				Item(
-					new
-				ID(client, clock),
-					null, // left
-					leftOrigin,
-					null,        // right
-					rightOrigin, // rightOrigin
-					cantCopyParentuint(info) && !hasParentYKey ? decoder.ReadLeftId() : (parentYKey != null ? (object)
-				doc.Get < AbstractType > (parentYKey) : null), // parent
-				cantCopyParentuint(info) && (info&lib0.Bit6) == lib0.Bit6 ? decoder.ReadString() : null, // parentSub
-					ReadItemContent(decoder, info) // content
-				)
 				refs = append(refs, str)
-				//                        clock += str.Length;
+				clock += str.Length
 
+			} else {
+				length := decoder.ReadLength()
+				gc := &structs.GC{
+					Id:     &ID{client, clock},
+					Length: length,
+				}
+				refs = append(refs, gc)
+				clock += length
 			}
 		}
-		// 	var numberOfStructs = (int)decoder.Reader.ReadVarUint();
-		//                Debug.Assert(numberOfStructs >= 0);
-		//
-		//                var refs = new List<AbstractStruct>(numberOfStructs);
-		//                long client = decoder.ReadClient();
-		//                long clock = decoder.Reader.ReadVarUint();
-		//
-		//                clientRefs[client] = refs;
-		//
-		//                for (var j = 0; j < numberOfStructs; j++)
-		//                {
-		//                    var info = decoder.ReadInfo();
-		//                    if ((Bits.Bits5 & info) != 0)
-		//                    {
-		//                        // The item that was originally to the left of this item.
-		//                        var leftOrigin = (uint(info) & lib0.Bit8) == lib0.Bit8 ? (ID?)decoder.ReadLeftId() : null;
-		//                        // The item that was originally to the right of this item.
-		//                        var rightOrigin = (uint(info) & lib0.Bit7) == lib0.Bit7 ? (ID?)decoder.ReadRightId() : null;
-		//                        var cantCopyParentInfo = (uint(info) & (lib0.Bit7 | lib0.Bit8)) == 0;
-		//                        var hasParentYKey = cantCopyParentInfo ? decoder.ReadParentInfo() : false;
-		//
-		//                        // If parent == null and neither left nor right are defined, then we know that 'parent' is child of 'y'
-		//                        // and we read the next string as parentYKey.
-		//                        // It indicates how we store/retrieve parent from 'y.share'.
-		//                        var parentYKey = cantCopyParentuint(info) && hasParentYKey ? decoder.ReadString() : null;
-		//
-		//                        var str = new Item(
-		//                            new ID(client, clock),
-		//                            null, // left
-		//                            leftOrigin,
-		//                            null, // right
-		//                            rightOrigin, // rightOrigin
-		//                            cantCopyParentuint(info) && !hasParentYKey ? decoder.ReadLeftId() : (parentYKey != null ? (object)doc.Get<AbstractType>(parentYKey) : null), // parent
-		//                            cantCopyParentuint(info) && (uint(info) & lib0.Bit6) == lib0.Bit6 ? decoder.ReadString() : null, // parentSub
-		//                            ReadItemContent(decoder, info) // content
-		//                            );
-		//
-		//                        refs.Add(str);
-		//                        clock += str.Length;
-		//                    }
-		//                    else
-		//                    {
-		//                        var length = decoder.ReadLength();
-		//                        refs.Add(new GC(new ID(client, clock), length));
-		//                        clock += length;
-		//                    }
+
 	}
-	return nil
+	return clientRefs
 }
 
 func ReadStateVector(decoder IDSDecoder) map[uint64]uint64 {
@@ -256,7 +187,6 @@ func DecodeStateVector(input io.Reader) map[uint64]uint64 {
 func WriteClientsStructs(encoder IUpdateEncoder, store *StructStore, _sm map[uint64]uint64) {
 	// We filter all valid _sm entries into sm.
 	var sm map[uint64]uint64
-
 	for client, clock := range _sm {
 		// Only write if new structs are available.
 		if store.GetState(client) > clock {
@@ -275,7 +205,6 @@ func WriteClientsStructs(encoder IUpdateEncoder, store *StructStore, _sm map[uin
 	// This heavily improves the conflict resolution algorithm.
 
 	sortedClients := sortClients(sm)
-
 	for _, client := range sortedClients {
 		WriteStructs(encoder, store.Clients[client], client, sm[client])
 	}

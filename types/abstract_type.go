@@ -9,8 +9,8 @@ type EventHandler func(v any)
 
 type AbstractType struct {
 	Item    *structs.Item
-	start   *structs.Item
-	itemMap map[string]*structs.Item
+	Start   *structs.Item
+	ItemMap map[string]*structs.Item
 
 	EventHandler     EventHandler
 	DeepEventHandler EventHandler

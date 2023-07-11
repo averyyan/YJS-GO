@@ -5,20 +5,20 @@ import "YJS-GO/utils"
 var _ IAbstractStruct = (*GC)(nil)
 
 type GC struct {
-	Id      utils.ID
+	Id      *utils.ID
 	Length  uint64
 	Deleted bool
 }
 
-func (G GC) GetLength() uint {
-	return uint(G.Length)
+func (G GC) GetLength() uint64 {
+	return G.Length
 }
 
 func (G GC) GetDeleted() bool {
 	return G.Deleted
 }
 
-func (G GC) ID() utils.ID {
+func (G GC) ID() *utils.ID {
 	return G.Id
 }
 
@@ -27,17 +27,17 @@ func (G GC) MergeWith(a any) bool {
 	panic("implement me")
 }
 
-func (G GC) Delete(transaction utils.Transaction) {
+func (G GC) Delete(transaction *utils.Transaction) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (G GC) Integrate(transaction utils.Transaction, offset int) {
+func (G GC) Integrate(transaction *utils.Transaction, offset int) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (G GC) GetMissing(transaction utils.Transaction, store utils.StructStore) {
+func (G GC) GetMissing(transaction *utils.Transaction, store *utils.StructStore) (uint64, error) {
 	// TODO implement me
 	panic("implement me")
 }

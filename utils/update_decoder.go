@@ -13,7 +13,7 @@ type IUpdateDecoder interface {
 	ReadString() string
 	ReadParentInfo() bool
 	ReadTypeRef() uint
-	ReadLength() int
+	ReadLength() uint64
 	ReadAny() any
 	ReadBuffer() []byte
 	ReadKey() string
@@ -22,7 +22,7 @@ type IUpdateDecoder interface {
 
 type IDSDecoder interface {
 	Reader() *bufio.Reader
-	ReadDsLength()
-	ReadDsClock()
+	ReadDsLength() uint64
+	ReadDsClock() uint64
 	ResetDsCurVal()
 }

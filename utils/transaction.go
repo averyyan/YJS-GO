@@ -12,6 +12,7 @@ type Transaction struct {
 	NewTypes       map[*structs.Item]struct{}
 	DeleteSet      DeleteSet
 	Changed        map[*types.AbstractType]map[string]struct{}
+	MergetStructs  []structs.IAbstractStruct
 }
 
 func (t Transaction) AddChangedTypeToTransaction(ty *types.AbstractType, parentSub string) {

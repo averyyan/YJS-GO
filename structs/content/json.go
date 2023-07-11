@@ -22,7 +22,7 @@ func (j Json) Copy() structs.IContent {
 	panic("implement me")
 }
 
-func (j Json) Splice(offset int) structs.IContent {
+func (j Json) Splice(offset uint64) structs.IContent {
 	// TODO implement me
 	panic("implement me")
 }
@@ -57,12 +57,12 @@ func (j Json) Gc(store utils.StructStore) {
 	panic("implement me")
 }
 
-func (j Json) Delete(transaction utils.Transaction) {
+func (j Json) Delete(transaction *utils.Transaction) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (j Json) Integrate(transaction utils.Transaction, item structs.Item) {
+func (j Json) Integrate(transaction *utils.Transaction, item structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }

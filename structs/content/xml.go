@@ -22,7 +22,7 @@ func (x Xml) Copy() structs.IContent {
 	panic("implement me")
 }
 
-func (x Xml) Splice(offset int) structs.IContent {
+func (x Xml) Splice(offset uint64) structs.IContent {
 	// TODO implement me
 	panic("implement me")
 }
@@ -57,12 +57,12 @@ func (x Xml) Gc(store utils.StructStore) {
 	panic("implement me")
 }
 
-func (x Xml) Delete(transaction utils.Transaction) {
+func (x Xml) Delete(transaction *utils.Transaction) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (x Xml) Integrate(transaction utils.Transaction, item structs.Item) {
+func (x Xml) Integrate(transaction *utils.Transaction, item structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }

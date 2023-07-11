@@ -19,7 +19,7 @@ type InfoEnum int
 var _ IAbstractStruct = (*Item)(nil)
 
 type Item struct {
-	Id          utils.ID
+	Id          *utils.ID
 	Length      uint64
 	Deleted     bool
 	Info        InfoEnum
@@ -34,7 +34,7 @@ type Item struct {
 	// Otherwise, it is 'parent._map'.
 	ParentSub string
 	Redone    *utils.ID
-	Content   IContentExt
+	Content   IContent
 	Marker    bool
 	Keep      bool
 	Countable bool
@@ -43,15 +43,15 @@ type Item struct {
 	Prev      any // AbstractStruct
 }
 
-func (i *Item) GetLength() uint {
-	return uint(i.Length)
+func (i *Item) GetLength() uint64 {
+	return i.Length
 }
 
 func (i *Item) GetDeleted() bool {
 	return i.Deleted
 }
 
-func (i *Item) ID() utils.ID {
+func (i *Item) ID() *utils.ID {
 	return i.Id
 }
 
@@ -80,7 +80,7 @@ func (i *Item) MergeWith(right any) bool {
 	return false
 }
 
-func (i *Item) Delete(transaction utils.Transaction) {
+func (i *Item) Delete(transaction *utils.Transaction) {
 	if !i.Deleted {
 		var parent = i.Parent
 		if i.Countable && i.ParentSub == "" {
@@ -91,16 +91,16 @@ func (i *Item) Delete(transaction utils.Transaction) {
 		i.MarkDeleted()
 		transaction.DeleteSet.Add(i.Id.Client, i.Id.Clock, uint64(i.Length))
 		transaction.AddChangedTypeToTransaction(parent.(*types.AbstractType), i.ParentSub)
-		i.Content.Delete(transaction)
+		i.Content.(IContentExt).Delete(transaction)
 	}
 }
 
-func (i *Item) Integrate(transaction utils.Transaction, offset int) {
+func (i *Item) Integrate(transaction *utils.Transaction, offset int) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (i *Item) GetMissing(transaction utils.Transaction, store utils.StructStore) {
+func (i *Item) GetMissing(transaction *utils.Transaction, store *utils.StructStore) (uint64, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -154,4 +154,60 @@ func (i *Item) GetPrev() any {
 
 func (i *Item) MarkDeleted() {
 	i.Info |= Deleted
+}
+
+// SplitItem Split 'leftItem' into two items.
+func (i *Item) SplitItem(transaction *utils.Transaction, diff uint64) *Item {
+	var client = i.Id.Client
+	var clock = i.Id.Clock
+	var countable InfoEnum
+	if i.Content.Countable() {
+		countable = Countable
+	}
+	var rightItem = &Item{
+		Id: &utils.ID{
+			Client: client,
+			Clock:  clock + diff,
+		},
+		LeftOrigin: &utils.ID{
+			Client: client,
+			Clock:  clock + diff - 1,
+		},
+		Left:        i,
+		RightOrigin: i.RightOrigin,
+		Right:       i.Right,
+		Parent:      i.Parent,
+		ParentSub:   i.ParentSub,
+		Content:     i.Content.Splice(diff).(IContentExt),
+		Info:        countable,
+	}
+
+	if i.Deleted {
+		rightItem.MarkDeleted()
+	}
+	if i.Keep {
+		rightItem.Keep = true
+	}
+	if i.Redone != nil {
+		rightItem.Redone = &utils.ID{
+			Client: i.Redone.Client,
+			Clock:  i.Redone.Clock + diff,
+		}
+	}
+
+	// Update left (do not set leftItem.RightOrigin as it will lead to problems when syncing).
+	i.Right = rightItem
+	// Update right.
+	rightIt := rightItem.Right.(*Item)
+	rightIt.Left = rightItem
+
+	// Right is more specific.
+	transaction.MergetStructs = append(transaction.MergetStructs, rightItem)
+	// Update parent._map.
+	if rightItem.ParentSub != "" && rightItem.Right == nil {
+		rightItem.Parent.(types.AbstractType).ItemMap[rightItem.ParentSub] = rightItem
+	}
+
+	i.Length = diff
+	return rightItem
 }
