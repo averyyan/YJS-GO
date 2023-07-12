@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"reflect"
 	"sort"
 
 	"YJS-GO/structs"
@@ -273,7 +274,6 @@ func (s *StructStore) CleanupPendingStructs() {
 func (s *StructStore) TryResumePendingDeleteReaders(transaction *Transaction) {
 	var pendingReaders = s.PendingDeleteReaders
 	s.PendingDeleteReaders = s.PendingDeleteReaders[:0] // 官方推荐使用nil,这里暂使用空切片
-
 	for i := 0; i < len(pendingReaders); i++ {
 		s.ReadAndApplyDeleteSet(pendingReaders[i], transaction)
 	}
@@ -312,7 +312,6 @@ func (s *StructStore) ReadAndApplyDeleteSet(decoder *DSDecoderV2, transaction *T
 		}
 
 		var state = s.GetState(client)
-
 		for deleteIndex := 0; deleteIndex < int(numberOfDeletes); deleteIndex++ {
 			var clock = decoder.ReadDsClock()
 			var clockEnd = clock + decoder.ReadDsLength()
@@ -355,11 +354,36 @@ func (s *StructStore) ReadAndApplyDeleteSet(decoder *DSDecoderV2, transaction *T
 	if len(unappliedDs.Clients) > 0 {
 		var unappliedDsEncoder = &DSEncoderV2{}
 		// @TODO: No need for encoding+decoding ds anymore.
-
 		unappliedDs.Write(unappliedDsEncoder)
 		s.PendingDeleteReaders = append(s.PendingDeleteReaders, NewDsDecoderV2(bytes.NewReader(unappliedDsEncoder.ToArray())))
-
 	}
+}
+
+func (s *StructStore) ReplaceStruct(oldStruct structs.IAbstractStruct, newStruct structs.IAbstractStruct) {
+	structs, ok := s.Clients[oldStruct.ID().Client]
+	if !ok {
+		// throw new Exception();
+		return
+	}
+
+	index := FindIndexSS(structs, oldStruct.ID().Clock)
+	structs[index] = newStruct
+}
+
+func (s *StructStore) GetItemCleanEnd(transaction *Transaction, id *ID) structs.IAbstractStruct {
+	strs, ok := s.Clients[id.Client]
+	if !ok {
+		// throw new Exception();
+		return nil
+	}
+	index := FindIndexSS(strs, id.Clock)
+	var str = strs[index]
+
+	if id.Clock != str.ID().Clock+str.GetLength()-1 && reflect.TypeOf(str) != reflect.TypeOf(&structs.GC{}) {
+		insert(strs, index+1, str.(*structs.Item).SplitItem(transaction, id.Clock-str.ID().Clock+1))
+	}
+
+	return str
 }
 
 func insert(arr []structs.IAbstractStruct, index uint, item *structs.Item) []structs.IAbstractStruct {

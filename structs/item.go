@@ -3,6 +3,7 @@ package structs
 import (
 	"reflect"
 
+	"YJS-GO/structs/content"
 	"YJS-GO/types"
 	"YJS-GO/utils"
 )
@@ -30,7 +31,7 @@ type Item struct {
 	Parent      any // Object
 	// If the parent refers to this item with some kind of key (e.g. YMap).
 	// The key is then used to refer to the list in which to insert this item.
-	// If 'parentSub = null', type._start is the list in which to insert to.
+	// If 'parentSub =nil', type._start is the list in which to insert to.
 	// Otherwise, it is 'parent._map'.
 	ParentSub string
 	Redone    *utils.ID
@@ -96,8 +97,166 @@ func (i *Item) Delete(transaction *utils.Transaction) {
 }
 
 func (i *Item) Integrate(transaction *utils.Transaction, offset int) {
-	// TODO implement me
-	panic("implement me")
+	if offset > 0 {
+		i.Id = &utils.ID{Client: i.Id.Client, Clock: i.Id.Clock + uint64(offset)}
+		i.Left = transaction.Doc.Store.GetItemCleanEnd(transaction, &utils.ID{Client: i.Id.Client, Clock: i.Id.Clock - 1})
+		i.LeftOrigin = i.Left.(*Item).LastId
+		i.Content = i.Content.(IContentExt).Splice(uint64(offset))
+		i.Length -= uint64(offset)
+	}
+
+	if i.Parent != nil {
+		if (i.Left == nil && (i.Right == nil || i.Right.(*Item).Left != nil)) ||
+			i.Left != nil && i.Left.(*Item).Right != i.Right {
+			var left = i.Left.(*Item)
+			var o IAbstractStruct
+			// Set 'o' to the first conflicting item.
+			if left != nil {
+				o = left.Right.(*Item)
+			} else if i.ParentSub != "" {
+				// Debug.Assert(Parent is AbstractType);
+				item, ok := i.Parent.(types.AbstractType).ItemMap[i.ParentSub]
+				if ok {
+					o = item
+				}
+				for o != nil && o.(*Item).Left != nil {
+					o = o.(*Item).Left.(*Item)
+				}
+			} else {
+				// Debug.Assert(ParentisAbstractType)o = Parent.(AbstractType)?._start
+			}
+
+			var conflictingItems = map[IAbstractStruct]struct{}{}
+			var itemsBeforeOrigin = map[IAbstractStruct]struct{}{}
+
+			for o != nil && o != i.Right {
+				itemsBeforeOrigin[o] = struct{}{}
+				conflictingItems[o] = struct{}{}
+
+				if utils.EQ(i.LeftOrigin, o.(*Item).LeftOrigin) {
+				// Case 1
+				if o.ID().Client < i.ID().Client {
+				left = o.(*Item)
+				conflictingItems=map[IAbstractStruct]struct{}{}
+				} else if utils.EQ(i.RightOrigin, o.(*Item).RightOrigin) {
+				// This and 'o' are conflicting and point to the same integration points.
+				// The id decides which item comes first.
+				// Since this is to the left of 'o', we can break here.
+				break
+				}
+				// Else, 'o' might be integrated before an item that this conflicts with.
+				// If so, we will find it in the next iterations.
+					// Use 'Find' instead of 'GetItemCleanEnd', because we don't want / need to split items.
+				}else if o.(*Item).LeftOrigin != nil && itemsBeforeOrigin.Contains(transaction.Doc.Store.Find((o.(*Item)).LeftOrigin.Value{
+				// Case 2
+				// TODO: Store.Find is called twice here, call once?
+				if (!conflictingItems.Contains(transaction.Doc.Store.Find((o.(*Item)).LeftOrigin.Value)))
+				{
+				left = o;
+				conflictingItems.Clear();
+				}
+				}
+				else
+				{
+				break;
+				}
+
+				o = (o.(*Item))?.Right
+			}
+
+			Left = left
+		}
+
+		// Reconnect left/right + update parent map/start if necessary.
+		if Left != nil {
+			if (Left is
+			Item
+			leftItem)
+			{
+			var right = leftItem.Right;
+			Right = right;
+			leftItem.Right = this;
+			}
+			else
+			{
+			Right = nil;
+			}
+		} else
+		{
+			AbstractStruct
+			r
+
+			if ParentSub != nil {
+				Item
+				item = nil
+				Parent.(AbstractType)?._map?.TryGetValue(ParentSub, out
+				item)
+				r = item
+
+				while(r != nil && (r.(*Item))?.Left != nil)
+				{
+				r = (r.(*Item)).Left;
+				}
+			} else
+			{
+				if (Parent is
+				AbstractType
+				abstractTypeParent)
+				{
+				r = abstractTypeParent._start;
+				abstractTypeParent._start = this;
+				}
+				else
+				{
+				r = nil;
+				}
+			}
+
+			Right = r
+		}
+
+		if Right != nil {
+			if (Right is
+			Item
+			rightItem)
+			{
+			rightItem.Left = this;
+			}
+		} else if ParentSub != nil {
+			// Set as current parent value if right == nil and this is parentSub.
+			Parent.(AbstractType)._map[ParentSub] = this
+			// This is the current attribute value of parent. Delete right.
+			Left?.Delete(transaction)
+		}
+
+		// Adjust length of parent.
+		if ParentSub == nil && Countable && !Deleted {
+			Debug.Assert(Parent
+			is
+			AbstractType)
+			Parent.(AbstractType).Length += Length
+		}
+
+		transaction.Doc.Store.AddStruct(this)
+		Content.Integrate(transaction, this)
+
+		// Add parent to transaction.changed.
+		transaction.AddChangedTypeToTransaction(Parent
+		as
+		AbstractType, ParentSub)
+
+		if (Parent as
+		AbstractType)?._item != nil && (Parent.(AbstractType)._item.Deleted) || (ParentSub != nil && Right != nil))
+		{
+		// Delete if parent is deleted or if this is not the current attribute value of parent.
+		Delete(transaction);
+		}
+	} else
+	{
+		// Parent is not defined. Integrate GC struct instead.
+		new
+		GC(Id, Length).Integrate(transaction, 0)
+	}
 }
 
 func (i *Item) GetMissing(transaction *utils.Transaction, store *utils.StructStore) (uint64, error) {
@@ -202,7 +361,7 @@ func (i *Item) SplitItem(transaction *utils.Transaction, diff uint64) *Item {
 	rightIt.Left = rightItem
 
 	// Right is more specific.
-	transaction.MergetStructs = append(transaction.MergetStructs, rightItem)
+	transaction.MergeStructs = append(transaction.MergeStructs, rightItem)
 	// Update parent._map.
 	if rightItem.ParentSub != "" && rightItem.Right == nil {
 		rightItem.Parent.(types.AbstractType).ItemMap[rightItem.ParentSub] = rightItem
@@ -210,4 +369,17 @@ func (i *Item) SplitItem(transaction *utils.Transaction, diff uint64) *Item {
 
 	i.Length = diff
 	return rightItem
+}
+
+func (i *Item) Gc(store *utils.StructStore, parentGCd bool) {
+	if !i.Deleted {
+		return
+		// throw new InvalidOperationException();
+	}
+	i.Content.(IContentExt).Gc(store)
+	if parentGCd {
+		store.ReplaceStruct(i, &GC{Id: i.Id, Length: i.Length})
+	} else {
+		i.Content = &content.Deleted{Length: i.Length}
+	}
 }

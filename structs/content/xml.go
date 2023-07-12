@@ -52,7 +52,7 @@ func (x Xml) Write(encoder utils.IUpdateEncoder, offset int) {
 	panic("implement me")
 }
 
-func (x Xml) Gc(store utils.StructStore) {
+func (x Xml) Gc(store *utils.StructStore) {
 	// TODO implement me
 	panic("implement me")
 }

@@ -56,7 +56,7 @@ func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
 	}
 }
 
-// ReadStructs Read the next Item in a Decoder and fill this Item with the read data.
+// ReadStructs Read the next ItemId in a Decoder and fill this ItemId with the read data.
 // <br/>
 // This is called when data is received from a remote peer.
 // public static void ReadStructs(IUpdateDecoder decoder, transaction *Transaction, StructStore store)
@@ -75,7 +75,7 @@ func ReadStructs(decoder IUpdateDecoder, transaction *Transaction, store StructS
 	store.TryResumePendingDeleteReaders(transaction)
 }
 
-func ReadClientStructRefs(decoder IUpdateDecoder, doc YDoc) map[uint64][]structs.IAbstractStruct {
+func ReadClientStructRefs(decoder IUpdateDecoder, doc *YDoc) map[uint64][]structs.IAbstractStruct {
 	var clientRefs = map[uint64][]structs.IAbstractStruct{}
 	numOfStateUpdates, err := binary.ReadUvarint(decoder.Reader())
 	if err != nil {
@@ -203,7 +203,6 @@ func WriteClientsStructs(encoder IUpdateEncoder, store *StructStore, _sm map[uin
 	binary.Write(encoder.RestWriter(), binary.LittleEndian, uint(len(sm)))
 	// Write items with higher client ids first.
 	// This heavily improves the conflict resolution algorithm.
-
 	sortedClients := sortClients(sm)
 	for _, client := range sortedClients {
 		WriteStructs(encoder, store.Clients[client], client, sm[client])

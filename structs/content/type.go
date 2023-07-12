@@ -52,7 +52,7 @@ func (t Type) Write(encoder utils.IUpdateEncoder, offset int) {
 	panic("implement me")
 }
 
-func (t Type) Gc(store utils.StructStore) {
+func (t Type) Gc(store *utils.StructStore) {
 	// TODO implement me
 	panic("implement me")
 }

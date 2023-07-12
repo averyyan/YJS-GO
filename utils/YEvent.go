@@ -36,8 +36,8 @@ type ChangeKey struct {
 
 type NewBaseType struct {
 	changes       ChangesCollection
-	Target        types.AbstractType
-	CurrentTarget types.AbstractType
+	Target        *types.AbstractType
+	CurrentTarget *types.AbstractType
 	Transaction   Transaction
 	Path          []any
 }

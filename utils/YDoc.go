@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"io"
+	"math/rand"
 	"reflect"
 
 	"YJS-GO/structs"
@@ -11,16 +12,34 @@ import (
 )
 
 type YDoc struct {
-	GC     bool
-	Filter GCFilter
-	Store  *StructStore
-	share  map[string]*types.AbstractType
+	GC                      bool
+	GCFilter                GCFilter
+	Store                   *StructStore
+	share                   map[string]*types.AbstractType
+	Transaction             *Transaction
+	TransactionCleanups     []*Transaction
+	BeforeTransaction       func(*Transaction)
+	BeforeObserverCalls     func(*Transaction)
+	AfterTransaction        func(*Transaction)
+	AfterTransactionCleanup func(*Transaction)
+	BeforeAllTransactions   func()
+	AfterAllTransactions    func([]*Transaction)
+	UpdateV2                func(data []byte, origin any, transaction *Transaction)
+	Destroyed               func()
+	SubdocsChanged          func(Loaded map[*YDoc]struct{}, Added map[*YDoc]struct{}, Removed map[*YDoc]struct{})
+	Subdocs                 map[*YDoc]struct{}
+	ClientId                uint64
 }
 
-type GCFilter struct {
+func GenerateNewClientId() uint64 {
+	return uint64(rand.Float64())
 }
 
-var DefaultPredicate *structs.Item = nil
+type GCFilter func(*structs.Item) bool
+
+var DefaultPredicate GCFilter = func(item *structs.Item) bool {
+	return true
+}
 var Store StructStore
 
 type TransactAction func(*Transaction)
@@ -43,8 +62,8 @@ func (d *YDocOptions) Clone() *YDocOptions {
 
 func NewDoc() *YDoc {
 	return &YDoc{
-		GC:     false,
-		Filter: GCFilter{},
+		GC:       false,
+		GCFilter: DefaultPredicate,
 	}
 }
 
@@ -84,7 +103,7 @@ func (d *YDoc) ApplyUpdateV2WithReader(reader io.Reader, origin interface{}) {
 		var structDecoder = NewUpdateDecoderV2(reader)
 		ReadStructs(structDecoder, tr, Store)
 	}
-	Transact(fun, origin, false)
+	d.Transact(fun, origin, false)
 }
 
 func (d *YDoc) Get(key string) *types.AbstractType {
@@ -122,8 +141,30 @@ func (d *YDoc) Get(key string) *types.AbstractType {
 
 }
 
-func Transact(tAction TransactAction, origin interface{}, b bool) {
+func (d *YDoc) Transact(tAction TransactAction, origin interface{}, local bool) {
+	var initialCall = false
+	if d.Transaction == nil {
+		initialCall = true
+		d.Transaction = NewTransaction(d, origin, local)
+		d.TransactionCleanups = append(d.TransactionCleanups, d.Transaction)
+		if len(d.TransactionCleanups) == 1 {
+			if d.BeforeAllTransactions != nil {
+				d.BeforeAllTransactions()
+			}
+		}
+		if d.BeforeTransaction != nil {
+			d.BeforeTransaction(d.Transaction)
+		}
+	}
 
+	tAction(d.Transaction)
+	if initialCall && d.TransactionCleanups[0] == d.Transaction {
+		// The first transaction ended, now process observer calls.
+		// Observer call may create new transacations for which we need to call the observers and do cleanup.
+		// We don't want to nest these calls, so we execute these calls one after another.
+		// Also we need to ensure that all cleanups are called, even if the observers throw errors.
+		CleanupTransactions(d.TransactionCleanups, 0)
+	}
 }
 
 func writeStateVector(encoder IDSEncoder) {

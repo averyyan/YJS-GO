@@ -52,7 +52,7 @@ func (j Json) Write(encoder utils.IUpdateEncoder, offset int) {
 	panic("implement me")
 }
 
-func (j Json) Gc(store utils.StructStore) {
+func (j Json) Gc(store *utils.StructStore) {
 	// TODO implement me
 	panic("implement me")
 }

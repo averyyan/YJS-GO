@@ -52,7 +52,7 @@ func (e Embed) Write(encoder utils.IUpdateEncoder, offset int) {
 	panic("implement me")
 }
 
-func (e Embed) Gc(store utils.StructStore) {
+func (e Embed) Gc(store *utils.StructStore) {
 	// TODO implement me
 	panic("implement me")
 }

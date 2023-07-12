@@ -10,6 +10,7 @@ import (
 var _ structs.IContentExt = (*Deleted)(nil)
 
 type Deleted struct {
+	Length uint64
 }
 
 func (d Deleted) MergeWith(right structs.IContent) bool {
@@ -52,7 +53,7 @@ func (d Deleted) Write(encoder utils.IUpdateEncoder, offset int) {
 	panic("implement me")
 }
 
-func (d Deleted) Gc(store utils.StructStore) {
+func (d Deleted) Gc(store *utils.StructStore) {
 	// TODO implement me
 	panic("implement me")
 }
