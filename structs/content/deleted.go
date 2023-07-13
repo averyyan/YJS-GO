@@ -1,8 +1,6 @@
 package content
 
 import (
-	"container/list"
-
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -11,6 +9,15 @@ var _ structs.IContentExt = (*Deleted)(nil)
 
 type Deleted struct {
 	Length uint64
+}
+
+func (d Deleted) GetRef() int {
+	return DeletedRef
+}
+
+func (d Deleted) SetRef(i int) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (d Deleted) MergeWith(right structs.IContent) bool {
@@ -33,7 +40,7 @@ func (d Deleted) Splice(offset uint64) structs.IContent {
 	panic("implement me")
 }
 
-func (d Deleted) GetContent() list.List {
+func (d Deleted) GetContent() []any {
 	// TODO implement me
 	panic("implement me")
 }
@@ -63,12 +70,7 @@ func (d Deleted) Delete(transaction *utils.Transaction) {
 	panic("implement me")
 }
 
-func (d Deleted) Integrate(transaction *utils.Transaction, item structs.Item) {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (d Deleted) GetRef() int {
+func (d Deleted) Integrate(transaction *utils.Transaction, item *structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }

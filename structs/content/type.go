@@ -1,8 +1,6 @@
 package content
 
 import (
-	"container/list"
-
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -10,6 +8,11 @@ import (
 var _ structs.IContentExt = (*Type)(nil)
 
 type Type struct {
+}
+
+func (t Type) SetRef(i int) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func ReadType(decoder utils.IUpdateDecoder) (Type, error) {
@@ -32,7 +35,7 @@ func (t Type) MergeWith(right structs.IContent) bool {
 	panic("implement me")
 }
 
-func (t Type) GetContent() list.List {
+func (t Type) GetContent() []any {
 	// TODO implement me
 	panic("implement me")
 }
@@ -62,12 +65,11 @@ func (t Type) Delete(transaction *utils.Transaction) {
 	panic("implement me")
 }
 
-func (t Type) Integrate(transaction *utils.Transaction, item structs.Item) {
+func (t Type) Integrate(transaction *utils.Transaction, item *structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }
 
 func (t Type) GetRef() int {
-	// TODO implement me
-	panic("implement me")
+	return TypeRef
 }

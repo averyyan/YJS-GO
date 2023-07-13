@@ -1,8 +1,6 @@
 package content
 
 import (
-	"container/list"
-
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -10,6 +8,16 @@ import (
 var _ structs.IContentExt = (*Json)(nil)
 
 type Json struct {
+}
+
+func (j Json) Integrate(transaction *utils.Transaction, item *structs.Item) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (j Json) SetRef(i int) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func ReadJson(decoder utils.IUpdateDecoder) (Json, error) {
@@ -32,7 +40,7 @@ func (j Json) MergeWith(right structs.IContent) bool {
 	panic("implement me")
 }
 
-func (j Json) GetContent() list.List {
+func (j Json) GetContent() []any {
 	// TODO implement me
 	panic("implement me")
 }
@@ -62,12 +70,6 @@ func (j Json) Delete(transaction *utils.Transaction) {
 	panic("implement me")
 }
 
-func (j Json) Integrate(transaction *utils.Transaction, item structs.Item) {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (j Json) GetRef() int {
-	// TODO implement me
-	panic("implement me")
+	return JsonRef
 }

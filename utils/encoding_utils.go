@@ -67,7 +67,7 @@ func WriteStateVector(encoder IDSEncoder, sv map[uint64]uint64) {
 // store.CleanupPendingStructs();
 // store.TryResumePendingDeleteReaders(transaction);
 // }
-func ReadStructs(decoder IUpdateDecoder, transaction *Transaction, store StructStore) {
+func ReadStructs(decoder IUpdateDecoder, transaction *Transaction, store *StructStore) {
 	var clientStructRefs = ReadClientStructRefs(decoder, transaction.Doc)
 	store.MergeReadStructsIntoPendingReads(clientStructRefs)
 	store.ResumeStructIntegration(transaction)

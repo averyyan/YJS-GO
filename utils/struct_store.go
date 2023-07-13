@@ -288,7 +288,7 @@ func (s *StructStore) GetState(c uint64) uint64 {
 	return 0
 }
 
-func (s *StructStore) ReadAndApplyDeleteSet(decoder *DSDecoderV2, transaction *Transaction) {
+func (s *StructStore) ReadAndApplyDeleteSet(decoder IDSDecoder, transaction *Transaction) {
 	var unappliedDs = &DeleteSet{}
 	numClients, err := binary.ReadUvarint(decoder.Reader())
 	if err != nil {
@@ -384,6 +384,38 @@ func (s *StructStore) GetItemCleanEnd(transaction *Transaction, id *ID) structs.
 	}
 
 	return str
+}
+
+func (s *StructStore) Find(id *ID) structs.IAbstractStruct {
+	strs, ok := s.Clients[id.Client]
+	if !ok {
+		// throw new Exception($"No structs for client: {id.Client}");
+		return nil
+	}
+
+	index := FindIndexSS(strs, id.Clock)
+	if index < 0 || int(index) >= len(strs) {
+		// throw new Exception($"Invalid struct index: {index}, max: {structs.Count}")
+		return nil
+	}
+
+	return strs[index]
+}
+
+func (s *StructStore) AddStruct(str structs.IAbstractStruct) {
+	strs, ok := s.Clients[str.ID().Client]
+	if !ok {
+		strs = []structs.IAbstractStruct{}
+		s.Clients[str.ID().Client] = strs
+	} else {
+		var lastStruct = strs[len(strs)-1]
+		if lastStruct.ID().Clock+lastStruct.GetLength() != str.ID().Clock {
+			// throw new Exception("Unexpected")
+			return
+		}
+	}
+
+	strs = append(strs, str)
 }
 
 func insert(arr []structs.IAbstractStruct, index uint, item *structs.Item) []structs.IAbstractStruct {

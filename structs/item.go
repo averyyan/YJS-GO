@@ -134,128 +134,104 @@ func (i *Item) Integrate(transaction *utils.Transaction, offset int) {
 				conflictingItems[o] = struct{}{}
 
 				if utils.EQ(i.LeftOrigin, o.(*Item).LeftOrigin) {
-				// Case 1
-				if o.ID().Client < i.ID().Client {
-				left = o.(*Item)
-				conflictingItems=map[IAbstractStruct]struct{}{}
-				} else if utils.EQ(i.RightOrigin, o.(*Item).RightOrigin) {
-				// This and 'o' are conflicting and point to the same integration points.
-				// The id decides which item comes first.
-				// Since this is to the left of 'o', we can break here.
-				break
-				}
-				// Else, 'o' might be integrated before an item that this conflicts with.
-				// If so, we will find it in the next iterations.
+					// Case 1
+					if o.ID().Client < i.ID().Client {
+						left = o.(*Item)
+						conflictingItems = map[IAbstractStruct]struct{}{}
+					} else if utils.EQ(i.RightOrigin, o.(*Item).RightOrigin) {
+						// This and 'o' are conflicting and point to the same integration points.
+						// The id decides which item comes first.
+						// Since this is to the left of 'o', we can break here.
+						break
+					}
+					// Else, 'o' might be integrated before an item that this conflicts with.
+					// If so, we will find it in the next iterations.
 					// Use 'Find' instead of 'GetItemCleanEnd', because we don't want / need to split items.
-				}else if o.(*Item).LeftOrigin != nil && itemsBeforeOrigin.Contains(transaction.Doc.Store.Find((o.(*Item)).LeftOrigin.Value{
-				// Case 2
-				// TODO: Store.Find is called twice here, call once?
-				if (!conflictingItems.Contains(transaction.Doc.Store.Find((o.(*Item)).LeftOrigin.Value)))
-				{
-				left = o;
-				conflictingItems.Clear();
-				}
-				}
-				else
-				{
-				break;
+				} else {
+					leftValue := transaction.Doc.Store.Find(o.(*Item).LeftOrigin)
+					_, ok := itemsBeforeOrigin[leftValue]
+					if o.(*Item).LeftOrigin != nil && ok {
+						// Case 2
+						// TODO: Store.Find is called twice here, call once?
+						_, ok := conflictingItems[leftValue]
+						if !ok {
+							left = o.(*Item)
+							conflictingItems = map[IAbstractStruct]struct{}{}
+						}
+					} else {
+						break
+					}
 				}
 
-				o = (o.(*Item))?.Right
+				o = o.(*Item).Right.(*Item)
 			}
-
-			Left = left
+			i.Left = left
 		}
 
 		// Reconnect left/right + update parent map/start if necessary.
-		if Left != nil {
-			if (Left is
-			Item
-			leftItem)
-			{
-			var right = leftItem.Right;
-			Right = right;
-			leftItem.Right = this;
+		if i.Left != nil {
+			leftItem, ok := i.Left.(*Item)
+			if ok {
+				var right = leftItem.Right
+				i.Right = right
+				leftItem.Right = i
+			} else {
+				i.Right = nil
 			}
-			else
-			{
-			Right = nil;
-			}
-		} else
-		{
-			AbstractStruct
-			r
-
-			if ParentSub != nil {
-				Item
-				item = nil
-				Parent.(AbstractType)?._map?.TryGetValue(ParentSub, out
-				item)
-				r = item
-
-				while(r != nil && (r.(*Item))?.Left != nil)
-				{
-				r = (r.(*Item)).Left;
+		} else {
+			var r IAbstractStruct
+			if i.ParentSub != "" {
+				var item *Item
+				item, ok := i.Parent.(*types.AbstractType).ItemMap[i.ParentSub]
+				if ok {
+					r = item
 				}
-			} else
-			{
-				if (Parent is
-				AbstractType
-				abstractTypeParent)
-				{
-				r = abstractTypeParent._start;
-				abstractTypeParent._start = this;
+				for r != nil && r.(*Item).Left != nil {
+					r = r.(*Item).Left.(*Item)
 				}
-				else
-				{
-				r = nil;
+			} else {
+				abstractTypeParent, ok := i.Parent.(*types.AbstractType)
+				if ok {
+					r = abstractTypeParent.Start
+					abstractTypeParent.Start = i
+				} else {
+					r = nil
 				}
 			}
-
-			Right = r
+			i.Right = r
 		}
 
-		if Right != nil {
-			if (Right is
-			Item
-			rightItem)
-			{
-			rightItem.Left = this;
+		if i.Right != nil {
+			rightItem, ok := i.Right.(*Item)
+			if ok {
+				rightItem.Left = i
 			}
-		} else if ParentSub != nil {
+		} else if i.ParentSub != "" {
 			// Set as current parent value if right == nil and this is parentSub.
-			Parent.(AbstractType)._map[ParentSub] = this
+			i.Parent.(*types.AbstractType).ItemMap[i.ParentSub] = i
 			// This is the current attribute value of parent. Delete right.
-			Left?.Delete(transaction)
+			i.Left.(IAbstractStruct).Delete(transaction)
 		}
 
 		// Adjust length of parent.
-		if ParentSub == nil && Countable && !Deleted {
-			Debug.Assert(Parent
-			is
-			AbstractType)
-			Parent.(AbstractType).Length += Length
+		if i.ParentSub == "" && i.Countable && !i.Deleted {
+			// Debug.Assert(Parent is AbstractType)
+			i.Parent.(*types.AbstractType).Length += i.Length
 		}
 
-		transaction.Doc.Store.AddStruct(this)
-		Content.Integrate(transaction, this)
+		transaction.Doc.Store.AddStruct(i)
+		i.Content.(IContentExt).Integrate(transaction, i)
 
 		// Add parent to transaction.changed.
-		transaction.AddChangedTypeToTransaction(Parent
-		as
-		AbstractType, ParentSub)
+		transaction.AddChangedTypeToTransaction(i.Parent.(*types.AbstractType), i.ParentSub)
 
-		if (Parent as
-		AbstractType)?._item != nil && (Parent.(AbstractType)._item.Deleted) || (ParentSub != nil && Right != nil))
-		{
-		// Delete if parent is deleted or if this is not the current attribute value of parent.
-		Delete(transaction);
+		if (i.Parent.(*types.AbstractType).Item != nil && i.Parent.(*types.AbstractType).Item.Deleted) || (i.ParentSub != "" && i.Right != nil) {
+			// Delete if parent is deleted or if this is not the current attribute value of parent.
+			i.Delete(transaction)
 		}
-	} else
-	{
+	} else {
 		// Parent is not defined. Integrate GC struct instead.
-		new
-		GC(Id, Length).Integrate(transaction, 0)
+		(&GC{Id: i.Id, Length: i.Length}).Integrate(transaction, 0)
 	}
 }
 

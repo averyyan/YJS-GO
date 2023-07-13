@@ -1,8 +1,6 @@
 package content
 
 import (
-	"container/list"
-
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -10,6 +8,11 @@ import (
 var _ structs.IContentExt = (*Embed)(nil)
 
 type Embed struct {
+}
+
+func (e Embed) SetRef(i int) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func ReadEmbed(decoder utils.IUpdateDecoder) (Embed, error) {
@@ -32,7 +35,7 @@ func (e Embed) MergeWith(right structs.IContent) bool {
 	panic("implement me")
 }
 
-func (e Embed) GetContent() list.List {
+func (e Embed) GetContent() []any {
 	// TODO implement me
 	panic("implement me")
 }
@@ -62,12 +65,11 @@ func (e Embed) Delete(transaction *utils.Transaction) {
 	panic("implement me")
 }
 
-func (e Embed) Integrate(transaction *utils.Transaction, item structs.Item) {
+func (e Embed) Integrate(transaction *utils.Transaction, item *structs.Item) {
 	// TODO implement me
 	panic("implement me")
 }
 
 func (e Embed) GetRef() int {
-	// TODO implement me
-	panic("implement me")
+	return EmbedRef
 }

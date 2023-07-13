@@ -166,6 +166,34 @@ func (ds *DeleteSet) TryMergeDeleteSet(store *StructStore) {
 	}
 }
 
+func (ds *DeleteSet) IsDeleted(id *ID) bool {
+	dis, ok := ds.Clients[id.Client]
+	return ok && ds.FindIndexSS(dis, id.Clock) > 0
+}
+
+func (ds *DeleteSet) FindIndexSS(dis []*DeleteItem, clock uint64) uint64 {
+	var left = 0
+	var right = len(dis) - 1
+
+	for left <= right {
+		var midIndex = (left + right) / 2
+		var mid = dis[midIndex]
+		var midClock = mid.Clock
+
+		if midClock <= clock {
+			if clock < midClock+mid.Length {
+				return uint64(midIndex)
+			}
+
+			left = midIndex + 1
+		} else {
+			right = midIndex - 1
+		}
+	}
+
+	return 0
+}
+
 func TryToMergeWithLeft(strs []structs.IAbstractStruct, pos int) {
 	var left = strs[pos-1]
 	var right = strs[pos]
