@@ -10,6 +10,10 @@ var _ structs.IContentExt = (*Type)(nil)
 type Type struct {
 }
 
+func NewType(v any) *Type {
+	return &Type{}
+}
+
 func (t Type) SetRef(i int) {
 	// TODO implement me
 	panic("implement me")

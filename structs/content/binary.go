@@ -8,6 +8,13 @@ import (
 var _ structs.IContentExt = (*Binary)(nil)
 
 type Binary struct {
+	Content []byte
+}
+
+func NewBinary(content []byte) *Binary {
+	return &Binary{
+		content,
+	}
 }
 
 func (b Binary) SetRef(i int) {

@@ -418,6 +418,22 @@ func (s *StructStore) AddStruct(str structs.IAbstractStruct) {
 	strs = append(strs, str)
 }
 
+func (s *StructStore) GetItemCleanStart(transaction *Transaction, id *ID) structs.IAbstractStruct {
+	strs, ok := s.Clients[id.Client]
+	if !ok {
+		// throw new Exception();
+		return nil
+	}
+	index := FindIndexSS(strs, id.Clock)
+	var str = strs[index]
+	if (id.Clock != str.ID().Clock+str.GetLength()-1) &&
+		!reflect.TypeOf(str).AssignableTo(reflect.TypeOf(structs.GC{})) {
+		insert(strs, index+1, str.(*structs.Item).SplitItem(transaction, id.Clock-str.ID().Clock+1))
+	}
+
+	return str
+}
+
 func insert(arr []structs.IAbstractStruct, index uint, item *structs.Item) []structs.IAbstractStruct {
 	if index > 0 && int(index) < len(arr) {
 		arr = append(arr[:index+1], arr[index:]...)

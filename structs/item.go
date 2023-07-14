@@ -162,7 +162,6 @@ func (i *Item) Integrate(transaction *utils.Transaction, offset int) {
 						break
 					}
 				}
-
 				o = o.(*Item).Right.(*Item)
 			}
 			i.Left = left

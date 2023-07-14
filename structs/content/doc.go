@@ -8,6 +8,11 @@ import (
 var _ structs.IContentExt = (*Doc)(nil)
 
 type Doc struct {
+	Doc *utils.YDoc
+}
+
+func NewDoc(doc *utils.YDoc) *Doc {
+	return &Doc{doc}
 }
 
 func (d Doc) SetRef(i int) {
