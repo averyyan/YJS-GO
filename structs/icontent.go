@@ -8,7 +8,7 @@ type IContent interface {
 	Copy() IContent
 	Splice(offset uint64) IContent
 	MergeWith(right IContent) bool
-	GetContent() []any
+	GetContent() any
 	GetLength() int
 	Countable() bool
 }

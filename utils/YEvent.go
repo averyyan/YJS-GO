@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"reflect"
+
 	"YJS-GO/structs"
 	"YJS-GO/types"
 )
@@ -21,10 +23,10 @@ type ChangesCollection struct {
 }
 
 type Delta struct {
-	Insert     []any
+	Insert     any
 	Delete     uint64
 	Retain     uint64
-	Attributes map[string]interface{}
+	Attributes map[string]any
 }
 
 type ChangeKey struct {
@@ -43,7 +45,7 @@ type NewBaseType struct {
 
 type YEvent struct {
 	NewBaseType
-	Transaction Transaction
+	Transaction *Transaction
 }
 
 func (event YEvent) CollectChanges() *ChangesCollection {
@@ -93,8 +95,8 @@ func (event YEvent) CollectChanges() *ChangesCollection {
 							packOp()
 							lastOp = &Delta{Insert: make([]any, 1)}
 						}
-
-						lastOp.Insert = append(lastOp.Insert, item.Content.GetContent())
+						lastOp.Insert = lastOp.Insert.([]any)
+						lastOp.Insert = append(lastOp.Insert.([]any), item.Content.GetContent()...)
 						added[item] = struct{}{}
 					} else {
 						if lastOp == nil || lastOp.Retain == 0 {
@@ -166,4 +168,8 @@ func (event YEvent) Deletes(item *structs.Item) bool {
 func (event YEvent) Adds(item *structs.Item) bool {
 	clock, ok := event.Transaction.BeforeState[item.ID().Client]
 	return ok && item.ID().Clock < clock
+}
+
+func EqualAttrs(val, value any) bool {
+	return reflect.DeepEqual(val, value)
 }

@@ -8,66 +8,63 @@ import (
 var _ structs.IContentExt = (*Embed)(nil)
 
 type Embed struct {
+	Embed any
+}
+
+func NewEmbed(embed any) *Embed {
+	var ret = &Embed{}
+	ret.Embed = embed
+	return ret
 }
 
 func (e Embed) SetRef(i int) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
-func ReadEmbed(decoder utils.IUpdateDecoder) (Embed, error) {
-	// TODO implement me
-	panic("implement me")
+func ReadEmbed(decoder utils.IUpdateDecoder) (*Embed, error) {
+	var content = decoder.ReadJson()
+	return NewEmbed(content), nil
 }
 
 func (e Embed) Copy() structs.IContent {
-	// TODO implement me
-	panic("implement me")
+	return NewEmbed(e.Embed)
 }
 
 func (e Embed) Splice(offset uint64) structs.IContent {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
+	return nil
 }
 
 func (e Embed) MergeWith(right structs.IContent) bool {
-	// TODO implement me
-	panic("implement me")
+	return false
 }
 
-func (e Embed) GetContent() []any {
-	// TODO implement me
-	panic("implement me")
+func (e Embed) GetContent() any {
+	return []any{e.Embed}
 }
 
 func (e Embed) GetLength() int {
-	// TODO implement me
-	panic("implement me")
+	return 1
 }
 
 func (e Embed) Countable() bool {
-	// TODO implement me
-	panic("implement me")
+	return true
 }
 
 func (e Embed) Write(encoder utils.IUpdateEncoder, offset int) {
-	// TODO implement me
-	panic("implement me")
+	encoder.WriteJson(e.Embed)
 }
 
 func (e Embed) Gc(store *utils.StructStore) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
 func (e Embed) Delete(transaction *utils.Transaction) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
 func (e Embed) Integrate(transaction *utils.Transaction, item *structs.Item) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
 func (e Embed) GetRef() int {

@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"YJS-GO/structs"
-	content2 "YJS-GO/structs/content"
+	"YJS-GO/structs/content"
 	"YJS-GO/utils"
 )
 
@@ -20,7 +20,7 @@ func NewYArrayBase() *YArrayBase {
 	}
 }
 
-func (b YArrayBase) clearSearchMarkers() {
+func (b YArrayBase) ClearSearchMarkers() {
 	b.searchMarkers.Clear()
 }
 
@@ -80,7 +80,7 @@ func (b YArrayBase) CallObserver(transaction *utils.Transaction, parentSubs map[
 	}
 }
 
-func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenceItem *structs.Item, content []any) {
+func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenceItem *structs.Item, contents []any) {
 	var left = referenceItem
 	var doc = transaction.Doc
 	var ownClientId = doc.ClientId
@@ -103,13 +103,13 @@ func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenc
 				RightOrigin: right.Id,
 				Parent:      b,
 				ParentSub:   "",
-				Content:     content2.NewAny(jsonContent),
+				Content:     content.NewAny(jsonContent),
 			}
 			left.Integrate(transaction, 0)
 			jsonContent = []any{}
 		}
 	}
-	for _, c := range content {
+	for _, c := range contents {
 		left = &structs.Item{
 			Id:          &utils.ID{Client: ownClientId, Clock: store.GetState(ownClientId)},
 			Left:        left,
@@ -122,17 +122,17 @@ func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenc
 		switch a := c.(type) {
 		case []byte:
 			packJsonContent()
-			left.Content = content2.NewBinary(a)
+			left.Content = content.NewBinary(a)
 			left.Integrate(transaction, 0)
 			break
 		case *utils.YDoc:
 			packJsonContent()
-			left.Content = content2.NewDoc(a)
+			left.Content = content.NewDoc(a)
 			left.Integrate(transaction, 0)
 			break
 		case AbstractType:
 			packJsonContent()
-			left.Content = content2.NewType(a)
+			left.Content = content.NewType(a)
 			left.Integrate(transaction, 0)
 			break
 		default:
@@ -187,10 +187,8 @@ func (b YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
 			if index < pIndex+p.Length {
 				break
 			}
-
 			pIndex += p.Length
 		}
-
 		p = p.Right.(*structs.Item)
 	}
 
@@ -207,7 +205,8 @@ func (b YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
 	// We want to make sure that p can't be merged with left, because that would screw up everything.
 	// In that case just return what we have (it is most likely the best marker anyway).
 	// Iterate to left until p can't be merged with left.
-	for p.Left != nil && p.Left.Id.Client == p.Id.Client && p.Left.Id.Clock+p.Left.Length == p.Id.Clock {
+	for p.Left != nil && p.Left.(structs.IAbstractStruct).ID().Client == p.Id.Client &&
+		p.Left.(structs.IAbstractStruct).ID().Clock+p.Left.(structs.IAbstractStruct).GetLength() == p.Id.Clock {
 		p = p.Left.(*structs.Item)
 		if p == nil {
 			break
@@ -216,26 +215,21 @@ func (b YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
 		}
 	}
 
-	if (marker != nil && Math.Abs(marker.Index-pIndex) < (p.Parent as
-	AbstractType).Length / MaxSearchMarkers))
-	{
-	// Adjust existing marker.
-	marker.Update(p, pIndex);
-	return marker;
+	if marker != nil && uint64(math.Abs(float64(marker.Index)-float64(pIndex))) <
+		p.Parent.(AbstractType).Length/uint64(MaxSearchMarkers) {
+		// Adjust existing marker.
+		marker.Update(p, pIndex)
+		return marker
 	}
-	else
-	{
 	// Create a new marker.
-	return b.searchMarkers.MarkPosition(p, pIndex);
-	}
-	return nil
+	return b.searchMarkers.MarkPosition(p, pIndex)
+
 }
 
 func (b YArrayBase) InternalSlice(start, end uint64) []any {
 	if start < 0 {
 		start += b.Length
 	}
-
 	if end < 0 {
 		end += b.Length
 	}
@@ -246,11 +240,9 @@ func (b YArrayBase) InternalSlice(start, end uint64) []any {
 		// new
 		// ArgumentOutOfRangeException(nameof(start))
 	}
-
 	if end < 0 {
 		return nil
 	}
-
 	if start > end {
 		return nil
 	}
@@ -258,12 +250,13 @@ func (b YArrayBase) InternalSlice(start, end uint64) []any {
 	length := end - start
 	// Debug.Assert(length >= 0)
 
-	var cs []any
-	var n = b.Start
-
+	var (
+		cs []any
+		n  = b.Start
+	)
 	for n != nil && length > 0 {
 		if n.Countable && !n.Deleted {
-			var c = n.Content.GetContent()
+			var c = n.Content.GetContent().([]any)
 			if uint64(len(c)) <= start {
 				start -= uint64(len(c))
 			} else {

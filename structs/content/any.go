@@ -18,16 +18,16 @@ func (a Any) SetRef(ref int) {
 	a.Ref = ref
 }
 
-func NewAny(content []any) *Any {
+func NewAny(content any) *Any {
 	return &Any{
 		Ref:     AnyRef,
-		Content: content,
+		Content: content.([]any),
 		Cable:   true,
-		Length:  len(content),
+		Length:  len(content.([]any)),
 	}
 }
 
-func ReadAny(decoder utils.IUpdateDecoder) (*Any, error) {
+func ReadAny(decoder utils.IUpdateDecoder) (**Any, error) {
 	var length = decoder.ReadLength()
 	var cs = make([]any, length)
 
@@ -54,7 +54,7 @@ func (a Any) MergeWith(right structs.IContent) bool {
 	return true
 }
 
-func (a Any) GetContent() []any {
+func (a Any) GetContent() any {
 	return a.Content
 }
 

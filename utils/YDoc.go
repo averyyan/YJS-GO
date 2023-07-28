@@ -29,6 +29,10 @@ type YDoc struct {
 	SubdocsChanged          func(Loaded map[*YDoc]struct{}, Added map[*YDoc]struct{}, Removed map[*YDoc]struct{})
 	Subdocs                 map[*YDoc]struct{}
 	ClientId                uint64
+	YDocOptions
+	ShouldLoad bool
+	// If this document is a subdocument - a document integrated into another document - them _item is defined.
+	Item *structs.Item
 }
 
 func GenerateNewClientId() uint64 {
@@ -51,6 +55,30 @@ type YDocOptions struct {
 	AutoLoad bool
 }
 
+func ReadYDocOptions(decoder IUpdateDecoder) *YDocOptions {
+	var dict = (decoder.ReadAny()).(map[string]any)
+
+	var result = &YDocOptions{}
+	var ok bool
+	result.GC, ok = dict["gc"].(bool)
+	if ok {
+		result.GC = true
+	}
+	result.GUID, ok = dict["guid"].(string)
+	if ok {
+		result.GUID = getUUID()
+	}
+	result.Meta, ok = dict["meta"].(map[string]string)
+	if ok {
+		result.Meta = nil
+	}
+	result.AutoLoad, ok = dict["autoLoad"].(bool)
+	if ok {
+		result.AutoLoad = false
+	}
+	return result
+}
+
 func (d *YDocOptions) Clone() *YDocOptions {
 	return &YDocOptions{
 		GC:       d.GC,
@@ -60,11 +88,36 @@ func (d *YDocOptions) Clone() *YDocOptions {
 	}
 }
 
-func NewDoc() *YDoc {
+func NewDoc(options *YDocOptions) *YDoc {
+	doc := &YDoc{}
+	if options == nil {
+		options = &YDocOptions{}
+	}
+	doc.TransactionCleanups = []*Transaction{}
+	doc.ClientId = GenerateNewClientId()
+	doc.share = map[string]*types.AbstractType{}
+	doc.Store = &StructStore{}
+	doc.Subdocs = map[*YDoc]struct{}{}
+	doc.ShouldLoad = options.AutoLoad
+	return doc
+}
+
+func NewDocWithOption(options *YDocOptions) *YDoc {
 	return &YDoc{
-		GC:       false,
+		GC:       options.GC,
 		GCFilter: DefaultPredicate,
 	}
+}
+
+func (d YDocOptions) Write(encoder IUpdateEncoder, offset int) {
+	var dict = map[string]any{}
+	dict["gc"] = d.GC
+	dict["guid"] = d.GUID
+	dict["autoLoad"] = d.AutoLoad
+	if d.Meta != nil {
+		dict["meta"] = d.Meta
+	}
+	encoder.WriteAny(dict)
 }
 
 func (d *YDoc) EncodeStateVectorV2() []byte {
@@ -94,17 +147,17 @@ func (d *YDoc) WriteStateAsUpdate(encoder IUpdateEncoder, targetStateVector map[
 	NewDeleteSet(d.Store).Write(encoder)
 }
 
-func (d *YDoc) ApplyUpdateV2(vector []byte, origin interface{}) {
-	d.ApplyUpdateV2WithReader(bytes.NewReader(vector), origin)
+func (d *YDoc) ApplyUpdateV2(vector []byte, origin interface{}, local ...bool) {
+	d.ApplyUpdateV2WithReader(bytes.NewReader(vector), origin, local...)
 }
 
-func (d *YDoc) ApplyUpdateV2WithReader(reader io.Reader, origin interface{}) {
+func (d *YDoc) ApplyUpdateV2WithReader(reader io.Reader, origin interface{}, local ...bool) {
 	var fun = func(tr *Transaction) {
 		var structDecoder = NewUpdateDecoderV2(reader)
 		ReadStructs(structDecoder, tr, d.Store)
 		Store.ReadAndApplyDeleteSet(structDecoder, tr)
 	}
-	d.Transact(fun, origin, false)
+	d.Transact(fun, origin, local...)
 }
 
 func (d *YDoc) Get(key string) *types.AbstractType {
@@ -142,11 +195,11 @@ func (d *YDoc) Get(key string) *types.AbstractType {
 
 }
 
-func (d *YDoc) Transact(tAction TransactAction, origin interface{}, local bool) {
+func (d *YDoc) Transact(tAction TransactAction, origin interface{}, local ...bool) {
 	var initialCall = false
 	if d.Transaction == nil {
 		initialCall = true
-		d.Transaction = NewTransaction(d, origin, local)
+		d.Transaction = NewTransaction(d, origin, local...)
 		d.TransactionCleanups = append(d.TransactionCleanups, d.Transaction)
 		if len(d.TransactionCleanups) == 1 {
 			if d.BeforeAllTransactions != nil {
@@ -166,6 +219,12 @@ func (d *YDoc) Transact(tAction TransactAction, origin interface{}, local bool) 
 		// Also we need to ensure that all cleanups are called, even if the observers throw errors.
 		CleanupTransactions(d.TransactionCleanups, 0)
 	}
+}
+
+func (d *YDoc) CloneOptionsWithNewGuid() *YDocOptions {
+	newOpts := d.YDocOptions.Clone()
+	newOpts.GUID = getUUID()
+	return newOpts
 }
 
 func writeStateVector(encoder IDSEncoder) {

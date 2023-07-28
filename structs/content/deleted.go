@@ -1,6 +1,8 @@
 package content
 
 import (
+	"reflect"
+
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -8,7 +10,12 @@ import (
 var _ structs.IContentExt = (*Deleted)(nil)
 
 type Deleted struct {
-	Length uint64
+	Length    uint64
+	countable bool
+}
+
+func NewDeleted(length int) *Deleted {
+	return &Deleted{Length: uint64(length)}
 }
 
 func (d Deleted) GetRef() int {
@@ -16,61 +23,59 @@ func (d Deleted) GetRef() int {
 }
 
 func (d Deleted) SetRef(i int) {
-	// TODO implement me
-	panic("implement me")
+	// do nothing
 }
 
 func (d Deleted) MergeWith(right structs.IContent) bool {
-	// TODO implement me
-	panic("implement me")
+	// Debug.Assert(right is ContentDeleted);
+	if reflect.TypeOf(right) != reflect.TypeOf(Deleted{}) {
+		return false
+	}
+	d.Length = uint64(int(d.Length) + right.GetLength())
+	return true
 }
 
-func ReadDeleted(decoder utils.IUpdateDecoder) (Deleted, error) {
-	// TODO implement me
-	panic("implement me")
+func ReadDeleted(decoder utils.IUpdateDecoder) (*Deleted, error) {
+	var length = decoder.ReadLength()
+	return NewDeleted(int(length)), nil
 }
 
 func (d Deleted) Copy() structs.IContent {
-	// TODO implement me
-	panic("implement me")
+	return NewDeleted(int(d.Length))
 }
 
 func (d Deleted) Splice(offset uint64) structs.IContent {
-	// TODO implement me
-	panic("implement me")
+	var right = NewDeleted(int(d.Length - offset))
+	d.Length = offset
+	return right
 }
 
-func (d Deleted) GetContent() []any {
-	// TODO implement me
-	panic("implement me")
+func (d Deleted) GetContent() any {
+	// do nothing
+	return nil
 }
 
 func (d Deleted) GetLength() int {
-	// TODO implement me
-	panic("implement me")
+	return int(d.Length)
 }
 
 func (d Deleted) Countable() bool {
-	// TODO implement me
-	panic("implement me")
+	return d.countable
 }
 
 func (d Deleted) Write(encoder utils.IUpdateEncoder, offset int) {
-	// TODO implement me
-	panic("implement me")
+	encoder.WriteLength(int(d.Length) - offset)
 }
 
 func (d Deleted) Gc(store *utils.StructStore) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
 func (d Deleted) Delete(transaction *utils.Transaction) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
 func (d Deleted) Integrate(transaction *utils.Transaction, item *structs.Item) {
-	// TODO implement me
-	panic("implement me")
+	transaction.DeleteSet.Add(item.Id.Client, item.Id.Clock, d.Length)
+	item.MarkDeleted()
 }

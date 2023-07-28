@@ -172,7 +172,7 @@ func CleanupTransactions(transactionCleanups []*Transaction, i int) {
 	}
 }
 
-func NewTransaction(doc *YDoc, origin interface{}, local bool) *Transaction {
+func NewTransaction(doc *YDoc, origin interface{}, local ...bool) *Transaction {
 	t := &Transaction{
 		Doc:                doc,
 		DeleteSet:          &DeleteSet{},
@@ -186,7 +186,11 @@ func NewTransaction(doc *YDoc, origin interface{}, local bool) *Transaction {
 		SubdocsRemoved:     map[*YDoc]struct{}{},
 		SubdocsLoaded:      map[*YDoc]struct{}{},
 		Origin:             origin,
-		Local:              local,
+	}
+	if len(local) == 0 {
+		t.Local = true
+	} else {
+		t.Local = false
 	}
 	return t
 }

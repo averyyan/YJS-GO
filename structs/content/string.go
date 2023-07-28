@@ -1,6 +1,8 @@
 package content
 
 import (
+	"strings"
+
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -8,14 +10,18 @@ import (
 var _ structs.IContentExt = (*String)(nil)
 
 type String struct {
+	content []any
+}
+
+func NewString(value string) *String {
+	return &String{}
 }
 
 func (s String) SetRef(i int) {
-	// TODO implement me
-	panic("implement me")
+	// Do nothing.
 }
 
-func ReadString(decoder utils.IUpdateDecoder) (String, error) {
+func ReadString(decoder utils.IUpdateDecoder) (*String, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -35,9 +41,8 @@ func (s String) MergeWith(right structs.IContent) bool {
 	panic("implement me")
 }
 
-func (s String) GetContent() []any {
-	// TODO implement me
-	panic("implement me")
+func (s String) GetContent() any {
+	return s.content
 }
 
 func (s String) GetLength() int {
@@ -72,4 +77,18 @@ func (s String) Integrate(transaction *utils.Transaction, item *structs.Item) {
 
 func (s String) GetRef() int {
 	return StringRef
+}
+
+func (s String) GetString() string {
+	var a = strings.Builder{}
+	for _, str := range s.GetContent().([]any) {
+		a.WriteString(str.(string))
+	}
+	return a.String()
+}
+func (s String) AppendToBuilder(sb strings.Builder) {
+	for _, c := range s.content {
+		sb.Append((char)
+		c)
+	}
 }
