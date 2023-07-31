@@ -27,7 +27,7 @@ func NewAny(content any) *Any {
 	}
 }
 
-func ReadAny(decoder utils.IUpdateDecoder) (**Any, error) {
+func ReadAny(decoder utils.IUpdateDecoder) (*Any, error) {
 	var length = decoder.ReadLength()
 	var cs = make([]any, length)
 
