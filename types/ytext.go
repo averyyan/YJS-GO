@@ -39,7 +39,8 @@ type YTextEvent struct {
 	KeysChanged      map[string]struct{}
 }
 
-func NewYTextEvent(arr *YText, transaction utils.Transaction, subs map[string]struct{}, target *AbstractType) *YTextEvent {
+func NewYTextEvent(arr *YText, transaction *utils.Transaction, subs map[string]struct{},
+	target *AbstractType) *YTextEvent {
 	textEvent := &YTextEvent{
 		YEvent: utils.YEvent{
 			NewBaseType: utils.NewBaseType{
@@ -283,4 +284,8 @@ func (p ItemTextListPosition) Forward() {
 
 	p.Left = p.Right
 	p.Right = p.Right.Right.(*structs.Item)
+}
+
+func ReadText(decoder utils.IUpdateDecoder) *YText {
+	return &YText{}
 }

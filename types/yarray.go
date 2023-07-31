@@ -4,10 +4,12 @@ import (
 	"math"
 
 	"YJS-GO/structs"
+	"YJS-GO/utils"
 	"github.com/uber-go/atomic"
 )
 
 type YArray struct {
+	AbstractType
 }
 
 // Assigned to '-1', so the first timestamp is '0'.
@@ -125,4 +127,8 @@ func minSearchMarks(asm []*ArraySearchMarker) *ArraySearchMarker {
 		}
 	}
 	return min
+}
+
+func ReadArr(decoder utils.IUpdateDecoder) *YArray {
+	return &YArray{}
 }

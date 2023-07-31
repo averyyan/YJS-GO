@@ -1,6 +1,8 @@
 package content
 
 import (
+	"errors"
+
 	"YJS-GO/structs"
 	"YJS-GO/types"
 	"YJS-GO/utils"
@@ -9,11 +11,11 @@ import (
 var _ structs.IContentExt = (*Type)(nil)
 
 type Type struct {
-	Type types.AbstractType
+	Type *types.AbstractType
 }
 
-func NewType(v any) *Type {
-	return &Type{}
+func NewType(v *types.AbstractType) *Type {
+	return &Type{v}
 }
 
 func (t Type) SetRef(i int) {
@@ -21,20 +23,20 @@ func (t Type) SetRef(i int) {
 }
 
 func ReadType(decoder utils.IUpdateDecoder) (*Type, error) {
-	var typeRef = decoder.ReadTypeRef();
-	switch (typeRef)
-	{
-	case YArray.YArrayRefId:
-		var arr = YArray.Read(decoder);
-		return new ContentType(arr);
-	case YMap.YMapRefId:
-		var map = YMap.Read(decoder);
-		return new ContentType(map);
-	case YText.YTextRefId:
-		var text = YText.Read(decoder);
-		return new ContentType(text);
+	var typeRef = decoder.ReadTypeRef()
+	switch typeRef {
+	case types.YArrayRefId:
+		var arr = types.ReadArr(decoder)
+		return NewType(arr), nil
+	case types.YMapRefId:
+		var m = types.ReadMap(decoder)
+		return NewType(m), nil
+	case types.YTextRefId:
+		var text = types.ReadText(decoder)
+		return NewType(text), nil
 	default:
-		throw new NotImplementedException($"Type {typeRef} not implemented");
+		// throw new NotImplementedException($"Type {typeRef} not implemented")
+		return nil, errors.New("Type {typeRef} not implemented")
 	}
 }
 
@@ -68,67 +70,52 @@ func (t Type) Write(encoder utils.IUpdateEncoder, offset int) {
 }
 
 func (t Type) Gc(store *utils.StructStore) {
-	var item = Type._start;
-	while (item != null)
-	{
-		item.Gc(store, parentGCd: true);
-		item = item.Right as Item;
+	var item = t.Type.Start
+	for item != nil {
+		item.Gc(store, true)
+		item = item.Right.(*structs.Item)
 	}
 
-	Type._start = null;
-
-	foreach (var kvp in Type._map)
-	{
-	var valueItem = kvp.Value;
-	while (valueItem != null)
-	{
-	valueItem.Gc(store, parentGCd: true);
-	valueItem = valueItem.Left as Item;
+	t.Type.Start = nil
+	for _, valueItem := range t.Type.ItemMap {
+		for valueItem != nil {
+			valueItem.Gc(store, true)
+			valueItem = valueItem.Left.(*structs.Item)
+		}
 	}
-	}
-
-	Type._map.Clear();
+	// Clear
+	t.Type.ItemMap = map[string]*structs.Item{}
 }
 
 func (t Type) Delete(transaction *utils.Transaction) {
-	var item = Type._start;
+	var item = t.Type.Start
 
-	while (item != null)
-	{
-		if (!item.Deleted)
-		{
-			item.Delete(transaction);
-		}
-		else
-		{
+	for item != nil {
+		if !item.Deleted {
+			item.Delete(transaction)
+		} else {
 			// This will be gc'd later and we want to merge it if possible.
 			// We try to merge all deleted items each transaction,
 			// but we have no knowledge about that this needs to merged
 			// since it is not in transaction. Hence we add it to transaction._mergeStructs.
-			transaction._mergeStructs.Add(item);
+			transaction.MergeStructs = append(transaction.MergeStructs, item)
 		}
 
-		item = item.Right as Item;
+		item = item.Right.(*structs.Item)
 	}
-
-	foreach (var valueItem in Type._map.Values)
-	{
-	if (!valueItem.Deleted)
-	{
-	valueItem.Delete(transaction);
+	for _, valueItem := range t.Type.ItemMap {
+		if !valueItem.Deleted {
+			valueItem.Delete(transaction)
+		} else {
+			// Same as above.
+			transaction.MergeStructs = append(transaction.MergeStructs, item)
+		}
 	}
-	else
-	{
-	// Same as above.
-	transaction._mergeStructs.Add(valueItem);
-	}
-	}
-
-	transaction.Changed.Remove(Type);
+	delete(transaction.Changed, t.Type)
 }
 
 func (t Type) Integrate(transaction *utils.Transaction, item *structs.Item) {
-	Type.Integrate(transaction.Doc, item);
+	t.Type.Integrate(transaction.Doc, item)
 }
 
 func (t Type) GetRef() int {

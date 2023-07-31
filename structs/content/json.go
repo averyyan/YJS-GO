@@ -1,6 +1,8 @@
 package content
 
 import (
+	"encoding/json"
+
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
@@ -25,19 +27,21 @@ func (j Json) SetRef(i int) {
 }
 
 func ReadJson(decoder utils.IUpdateDecoder) (*Json, error) {
-	var len = decoder.ReadLength();
-	var content = new List<object>(len);
+	var length = decoder.ReadLength()
+	var content = make([]any, length)
 
-	for (int i = 0; i < len; i++)
-	{
-	var jsonStr = decoder.ReadString();
-	object jsonObj = string.Equals(jsonStr, "undefined")
-	? null
-	: Newtonsoft.Json.JsonConvert.DeserializeObject(jsonStr);
-	content.Add(jsonObj);
+	for i := 0; i < int(length); i++ {
+		var jsonStr = decoder.ReadString()
+		var jsonObj interface{}
+		if jsonStr == "undefined" {
+			jsonObj = nil
+		} else {
+			json.Unmarshal([]byte(jsonStr), jsonObj)
+		}
+		content = append(content, jsonObj)
 	}
 
-	return new ContentJson(content);
+	return NewJson(content), nil
 }
 
 func (j Json) Copy() structs.IContent {
@@ -46,14 +50,14 @@ func (j Json) Copy() structs.IContent {
 
 func (j Json) Splice(offset uint64) structs.IContent {
 	var right = NewJson(j.Content[int(offset) : len(j.Content)-int(offset)])
-	j.Content.RemoveRange(offset, _content.Count-offset)
+	j.Content = append(j.Content[0:offset], j.Content[len(j.Content)-int(offset):]...)
 	return right
 }
 
 func (j Json) MergeWith(right structs.IContent) bool {
-	Debug.Assert(right is ContentJson);
-	_content.AddRange((right as ContentJson)._content);
-	return true;
+	// Debug.Assert(right is ContentJson)
+	j.Content = append(j.Content, right.GetContent().([]any)...)
+	return true
 }
 
 func (j Json) GetContent() any {
@@ -73,12 +77,14 @@ func (j Json) Countable() bool {
 }
 
 func (j Json) Write(encoder utils.IUpdateEncoder, offset int) {
-	var len = _content.Count;
-	encoder.WriteLength(len);
-	for (int i = offset; i < len; i++)
-	{
-	var jsonStr = Newtonsoft.Json.JsonConvert.SerializeObject(_content[i]);
-	encoder.WriteString(jsonStr);
+	var length = len(j.Content)
+	encoder.WriteLength(length)
+	for i := offset; i < length; i++ {
+		jsonStr, err := json.Marshal(j.Content[i])
+		if err != nil {
+			continue
+		}
+		encoder.WriteString(string(jsonStr))
 	}
 }
 

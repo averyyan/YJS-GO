@@ -1,11 +1,19 @@
 package types
 
 import (
+	"fmt"
+
 	"YJS-GO/structs"
 	"YJS-GO/utils"
 )
 
 type EventHandler func(v any)
+
+type IAbstractType interface {
+	CallObserver(transaction *utils.Transaction, subs map[string]struct{})
+	CallDeepEventHandlerListeners(events []*utils.YEvent, transaction *utils.Transaction)
+	Integrate(doc *utils.YDoc, item *structs.Item)
+}
 
 type AbstractType struct {
 	Item    *structs.Item
@@ -39,6 +47,10 @@ func (at AbstractType) CallDeepEventHandlerListeners(events []*utils.YEvent, tra
 			Transaction: transaction,
 		})
 	}
+}
+
+func (at AbstractType) Write(utils.IUpdateEncoder) {
+	fmt.Printf("not implement")
 }
 
 type YEventArgs struct {

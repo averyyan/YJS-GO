@@ -130,7 +130,7 @@ func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenc
 			left.Content = content.NewDoc(a)
 			left.Integrate(transaction, 0)
 			break
-		case AbstractType:
+		case *AbstractType:
 			packJsonContent()
 			left.Content = content.NewType(a)
 			left.Integrate(transaction, 0)

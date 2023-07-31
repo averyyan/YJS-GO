@@ -22,3 +22,7 @@ func NewYMapEvent(ymap *YMap, t *utils.Transaction, subs map[string]struct{}) *Y
 type YMap struct {
 	AbstractType
 }
+
+func ReadMap(decoder utils.IUpdateDecoder) *YMap {
+	return &YMap{}
+}
