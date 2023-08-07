@@ -20,11 +20,11 @@ func NewYArrayBase() *YArrayBase {
 	}
 }
 
-func (b YArrayBase) ClearSearchMarkers() {
+func (b *YArrayBase) ClearSearchMarkers() {
 	b.searchMarkers.Clear()
 }
 
-func (b YArrayBase) InsertGeneric(transaction *utils.Transaction, index uint64, content []any) {
+func (b *YArrayBase) InsertGeneric(transaction *utils.Transaction, index uint64, content []any) {
 	if index == 0 {
 		if b.searchMarkers.Count() > 0 {
 			b.searchMarkers.UpdateMarkerChanges(index, uint64(len(content)))
@@ -74,13 +74,13 @@ func (b YArrayBase) InsertGeneric(transaction *utils.Transaction, index uint64, 
 }
 
 // CallObserver Creates YArrayEvent and calls observers.
-func (b YArrayBase) CallObserver(transaction *utils.Transaction, parentSubs map[string]struct{}) {
+func (b *YArrayBase) CallObserver(transaction *utils.Transaction, parentSubs map[string]struct{}) {
 	if !transaction.Local {
 		b.searchMarkers.Clear()
 	}
 }
 
-func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenceItem *structs.Item, contents []any) {
+func (b *YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenceItem *structs.Item, contents []any) {
 	var left = referenceItem
 	var doc = transaction.Doc
 	var ownClientId = doc.ClientId
@@ -148,7 +148,7 @@ func (b YArrayBase) InsertGenericsAfter(transaction *utils.Transaction, referenc
 // They speed up the process of finding a position without much bookkeeping.
 // A maximum of 'MaxSearchMarker' objects are created.
 // This function always returns a refreshed marker (updated timestamp).
-func (b YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
+func (b *YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
 	if b.Start == nil || index == 0 || b.searchMarkers == nil || b.searchMarkers.Count() == 0 {
 		return nil
 	}
@@ -226,7 +226,7 @@ func (b YArrayBase) FindMarker(index uint64) *ArraySearchMarker {
 
 }
 
-func (b YArrayBase) InternalSlice(start, end uint64) []any {
+func (b *YArrayBase) InternalSlice(start, end uint64) []any {
 	if start < 0 {
 		start += b.Length
 	}

@@ -334,7 +334,6 @@ func (i *Item) SplitItem(transaction *utils.Transaction, diff uint64) *Item {
 	// Update right.
 	rightIt := rightItem.Right.(*Item)
 	rightIt.Left = rightItem
-
 	// Right is more specific.
 	transaction.MergeStructs = append(transaction.MergeStructs, rightItem)
 	// Update parent._map.
@@ -357,4 +356,37 @@ func (i *Item) Gc(store *utils.StructStore, parentGCd bool) {
 	} else {
 		i.Content = &content.Deleted{Length: i.Length}
 	}
+}
+
+func (i *Item) KeepItemAndParents(value bool) {
+	var item = i
+	for item != nil && item.Keep != value {
+		item.Keep = value
+		tmp, ok := item.Parent.(*types.AbstractType)
+		if ok && tmp != nil {
+			item = tmp.Item
+		} else {
+			item = nil
+		}
+	}
+}
+
+func NewItem(id *utils.ID, left IAbstractStruct, leftOrigin *utils.ID, right IAbstractStruct, rightOrigin *utils.ID, parent any, parentSub string, content IContent) *Item {
+	t := &Item{}
+	t.Id = id
+	t.Length = uint64(content.GetLength())
+	t.LeftOrigin = leftOrigin
+	t.Left = left
+	t.Right = right
+	t.RightOrigin = rightOrigin
+	t.Parent = parent
+	t.ParentSub = parentSub
+	t.Redone = nil
+	t.Content = content.(IContentExt)
+	if content.Countable() {
+		t.Info = Countable
+	} else {
+		t.Info = 0
+	}
+	return t
 }

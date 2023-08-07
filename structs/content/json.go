@@ -72,8 +72,7 @@ func (j Json) GetLength() int {
 }
 
 func (j Json) Countable() bool {
-	// TODO implement me
-	panic("implement me")
+	return true
 }
 
 func (j Json) Write(encoder utils.IUpdateEncoder, offset int) {

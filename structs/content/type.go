@@ -11,10 +11,11 @@ import (
 var _ structs.IContentExt = (*Type)(nil)
 
 type Type struct {
-	Type *types.AbstractType
+	// Type *types.AbstractType
+	Type any
 }
 
-func NewType(v *types.AbstractType) *Type {
+func NewType(v any) *Type {
 	return &Type{v}
 }
 
@@ -41,7 +42,7 @@ func ReadType(decoder utils.IUpdateDecoder) (*Type, error) {
 }
 
 func (t Type) Copy() structs.IContent {
-	return NewType(t.Type)
+	return NewType(t.GetType())
 }
 
 func (t Type) Splice(offset uint64) structs.IContent {
@@ -54,7 +55,7 @@ func (t Type) MergeWith(right structs.IContent) bool {
 }
 
 func (t Type) GetContent() any {
-	return []any{t.Type}
+	return []any{t.GetType()}
 }
 
 func (t Type) GetLength() int {
@@ -65,30 +66,34 @@ func (t Type) Countable() bool {
 	return true
 }
 
+func (t Type) GetType() *types.AbstractType {
+	return t.Type.(*types.AbstractType)
+}
+
 func (t Type) Write(encoder utils.IUpdateEncoder, offset int) {
-	t.Type.Write(encoder)
+	t.GetType().Write(encoder)
 }
 
 func (t Type) Gc(store *utils.StructStore) {
-	var item = t.Type.Start
+	var item = t.GetType().Start
 	for item != nil {
 		item.Gc(store, true)
 		item = item.Right.(*structs.Item)
 	}
 
-	t.Type.Start = nil
-	for _, valueItem := range t.Type.ItemMap {
+	t.GetType().Start = nil
+	for _, valueItem := range t.GetType().ItemMap {
 		for valueItem != nil {
 			valueItem.Gc(store, true)
 			valueItem = valueItem.Left.(*structs.Item)
 		}
 	}
 	// Clear
-	t.Type.ItemMap = map[string]*structs.Item{}
+	t.GetType().ItemMap = map[string]*structs.Item{}
 }
 
 func (t Type) Delete(transaction *utils.Transaction) {
-	var item = t.Type.Start
+	var item = t.GetType().Start
 
 	for item != nil {
 		if !item.Deleted {
@@ -103,7 +108,7 @@ func (t Type) Delete(transaction *utils.Transaction) {
 
 		item = item.Right.(*structs.Item)
 	}
-	for _, valueItem := range t.Type.ItemMap {
+	for _, valueItem := range t.GetType().ItemMap {
 		if !valueItem.Deleted {
 			valueItem.Delete(transaction)
 		} else {
@@ -111,11 +116,11 @@ func (t Type) Delete(transaction *utils.Transaction) {
 			transaction.MergeStructs = append(transaction.MergeStructs, item)
 		}
 	}
-	delete(transaction.Changed, t.Type)
+	delete(transaction.Changed, t.GetType())
 }
 
 func (t Type) Integrate(transaction *utils.Transaction, item *structs.Item) {
-	t.Type.Integrate(transaction.Doc, item)
+	t.GetType().Integrate(transaction.Doc, item)
 }
 
 func (t Type) GetRef() int {

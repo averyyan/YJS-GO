@@ -5,18 +5,20 @@ import (
 	"sort"
 
 	"YJS-GO/structs"
+	"YJS-GO/structs/content"
 	"YJS-GO/types"
 )
 
 type Transaction struct {
-	Doc                *YDoc
-	BeforeState        map[uint64]uint64
-	AfterState         map[uint64]uint64
-	DeletedStructs     map[*structs.Item]struct{}
-	NewTypes           map[*structs.Item]struct{}
-	DeleteSet          *DeleteSet
-	Changed            map[*types.AbstractType]map[string]struct{}
-	ChangedParentTypes map[*types.AbstractType]map[string]*YEvent
+	Doc            *YDoc
+	BeforeState    map[uint64]uint64
+	AfterState     map[uint64]uint64
+	DeletedStructs map[*structs.Item]struct{}
+	NewTypes       map[*structs.Item]struct{}
+	DeleteSet      *DeleteSet
+	// Changed            map[*types.AbstractType]map[string]struct{}
+	Changed            map[any]map[string]struct{}
+	ChangedParentTypes map[*types.AbstractType][]*YEvent
 	MergeStructs       []structs.IAbstractStruct
 	Origin             any
 	Local              bool
@@ -48,8 +50,8 @@ func CleanupTransactions(transactionCleanups []*Transaction, i int) {
 		// })
 		actions = append(actions, func() {
 			for itemType, subs := range transaction.Changed {
-				if itemType.Item == nil || !itemType.Item.Deleted {
-					itemType.CallObserver(transaction, subs)
+				if itemType.(*types.AbstractType).Item == nil || !itemType.(*types.AbstractType).Item.Deleted {
+					itemType.(*types.AbstractType).CallObserver(transaction, subs)
 				}
 			}
 		})
@@ -178,8 +180,8 @@ func NewTransaction(doc *YDoc, origin interface{}, local ...bool) *Transaction {
 		DeleteSet:          &DeleteSet{},
 		BeforeState:        doc.Store.GetStateVector(),
 		AfterState:         map[uint64]uint64{},
-		Changed:            map[*types.AbstractType]map[string]struct{}{},
-		ChangedParentTypes: map[*types.AbstractType]map[string]*YEvent{},
+		Changed:            map[any]map[string]struct{}{},
+		ChangedParentTypes: map[*types.AbstractType][]*YEvent{},
 		MergeStructs:       []structs.IAbstractStruct{},
 		Meta:               map[string]any{},
 		SubdocsAdded:       map[*YDoc]struct{}{},
@@ -195,7 +197,7 @@ func NewTransaction(doc *YDoc, origin interface{}, local ...bool) *Transaction {
 	return t
 }
 
-func (t Transaction) AddChangedTypeToTransaction(ty *types.AbstractType, parentSub string) {
+func (t *Transaction) AddChangedTypeToTransaction(ty *types.AbstractType, parentSub string) {
 	var item = ty.Item
 
 	clock, ok := t.BeforeState[item.Id.Client]
@@ -208,4 +210,118 @@ func (t Transaction) AddChangedTypeToTransaction(ty *types.AbstractType, parentS
 		}
 		set[parentSub] = struct{}{}
 	}
+}
+
+// RedoItem Redoes the effect of this operation.
+func (t *Transaction) RedoItem(item *structs.Item, redoItems map[*structs.Item]struct{}) structs.IAbstractStruct {
+	var doc = t.Doc
+	var store = doc.Store
+	var ownClientId = doc.ClientId
+	var redone = item.Redone
+
+	if redone != nil {
+		return store.GetItemCleanStart(t, redone)
+	}
+	parentItem := item.Parent.(*types.AbstractType).Item
+
+	var left structs.IAbstractStruct
+	var right structs.IAbstractStruct
+	if item.ParentSub == "" {
+		// Is an array item. Insert at the old position.
+		left = item.Left.(structs.IAbstractStruct)
+		right = item
+	} else {
+		// Is a map item. Insert at current value.
+		left = item
+		for left != nil && left.(*structs.Item).Right != nil {
+			left = left.(*structs.Item).Right.(*structs.Item)
+			if left.ID().Client != ownClientId {
+				// It is not possible to redo this item because it conflicts with a change from another client.
+				return nil
+			}
+		}
+
+		if left != nil && left.(*structs.Item).Right != nil {
+			left = item.Parent.(*types.AbstractType).ItemMap[item.ParentSub]
+		}
+
+		right = nil
+	}
+
+	// Make sure that parent is redone.
+	if parentItem != nil && parentItem.Deleted && parentItem.Redone == nil {
+		// Try to undo parent if it will be undone anyway.
+		if _, ok := redoItems[parentItem]; !ok || t.RedoItem(parentItem, redoItems) == nil {
+			return nil
+		}
+	}
+
+	if parentItem != nil && parentItem.Redone != nil {
+		for parentItem.Redone != nil {
+			parentItem = store.GetItemCleanStart(t, parentItem.Redone).(*structs.Item)
+		}
+
+		// Find next cloned_redo items.
+		for left != nil {
+			var leftTrace = left
+			for leftTrace != nil && leftTrace.(*structs.Item).Parent.(*types.AbstractType).Item != parentItem {
+				if leftTrace.(*structs.Item).Redone == nil {
+					leftTrace = nil
+				} else {
+					leftTrace = store.GetItemCleanStart(t, leftTrace.(*structs.Item).Redone)
+				}
+			}
+
+			if leftTrace != nil && leftTrace.(*structs.Item).Parent.(*types.AbstractType).Item == parentItem {
+				left = leftTrace
+				break
+			}
+
+			left = left.(*structs.Item).Left.(*structs.Item)
+		}
+
+		for right != nil {
+			var rightTrace = right
+			for rightTrace != nil && rightTrace.(*structs.Item).Parent.(*types.AbstractType).Item != parentItem {
+				if rightTrace.(*structs.Item).Redone == nil {
+					rightTrace = nil
+				} else {
+					rightTrace = store.GetItemCleanStart(t, rightTrace.(*structs.Item).Redone)
+				}
+			}
+
+			if rightTrace != nil && rightTrace.(*structs.Item).Parent.(*types.AbstractType).Item == parentItem {
+				right = rightTrace
+				break
+			}
+
+			right = right.(*structs.Item).Right.(*structs.Item)
+		}
+	}
+
+	var nextClock = store.GetState(ownClientId)
+	var nextId = &ID{ownClientId, nextClock}
+	var tmp *types.AbstractType
+	if parentItem == nil {
+		tmp = item.Parent.(*types.AbstractType)
+	} else {
+		tmp = parentItem.Content.(*content.Type).GetType()
+	}
+	var redoneItem = structs.NewItem(
+		nextId,
+		left,
+		left.(*structs.Item).LastId,
+		right,
+		right.ID(),
+		tmp,
+		item.ParentSub,
+		item.Content.Copy())
+
+	item.Redone = nextId
+
+	redoneItem.KeepItemAndParents(true)
+	redoneItem.Integrate(t, 0)
+
+	return redoneItem
+
 }

@@ -26,8 +26,9 @@ type StackItem struct {
 type StackEventArgs struct {
 	StackItem          StackItem
 	Type               OperationType
-	ChangedParentTypes map[types.AbstractType][]YEvent // public IDictionary<AbstractType, IList<YEvent>> ChangedParentTypes { get; }
-	Origin             any
+	ChangedParentTypes map[*types.AbstractType][]YEvent // public IDictionary<AbstractType,
+	// IList<YEvent>> ChangedParentTypes { get; }
+	Origin any
 }
 
 type UndoManager struct {

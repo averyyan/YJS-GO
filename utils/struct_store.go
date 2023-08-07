@@ -21,6 +21,8 @@ type StructStore struct {
 	PendingDeleteReaders    []*DSDecoderV2
 }
 
+// FindIndexSS Perform a binary search on a sorted array.
+// TODO: [quan.chen] IList<AbstractStruct> to custom class, and move this method there?
 func FindIndexSS(abstractStructs []structs.IAbstractStruct, clock uint64) uint {
 	if len(abstractStructs) <= 0 {
 		return 0
@@ -65,7 +67,7 @@ type PendingClientStructRef struct {
 	Refs              []structs.IAbstractStruct
 }
 
-// Return the states as a Map<int,int>.
+// GetStateVector Return the states as a Map[int]int
 // Note that Clock refers to the next expected Clock id.
 func (s *StructStore) GetStateVector() map[uint64]uint64 {
 	var result = map[uint64]uint64{}
@@ -386,6 +388,7 @@ func (s *StructStore) GetItemCleanEnd(transaction *Transaction, id *ID) structs.
 	return str
 }
 
+// Find Expects that id is actually in store. This function throws or is an infinite loop otherwise.
 func (s *StructStore) Find(id *ID) structs.IAbstractStruct {
 	strs, ok := s.Clients[id.Client]
 	if !ok {
@@ -432,6 +435,67 @@ func (s *StructStore) GetItemCleanStart(transaction *Transaction, id *ID) struct
 	}
 
 	return str
+}
+
+func (s *StructStore) IterateStructs(transaction *Transaction, strs []structs.IAbstractStruct, clockStart uint64,
+	length uint64, fun func(abstractStruct structs.IAbstractStruct) bool) {
+	if length <= 0 {
+		return
+	}
+
+	var clockEnd = clockStart + length
+	var index = FindIndexCleanStart(transaction, strs, clockStart)
+	var str structs.IAbstractStruct
+
+	for {
+		str = strs[index]
+
+		if clockEnd < str.ID().Clock+str.GetLength() {
+			FindIndexCleanStart(transaction, strs, clockEnd)
+		}
+
+		if !fun(str) {
+			break
+		}
+
+		index++
+		if index < uint(len(strs)) && strs[index].ID().Clock < clockEnd {
+			break
+		}
+	}
+}
+
+func (s *StructStore) FollowRedone(id *ID) (structs.IAbstractStruct, uint64) {
+	var nextId = id
+	var diff uint64 = 0
+	var item structs.IAbstractStruct
+	for {
+		if diff > 0 {
+			nextId = &ID{nextId.Client, nextId.Clock + diff}
+		}
+
+		item = s.Find(nextId)
+		diff = nextId.Clock - item.ID().Clock
+		nextId = item.(*structs.Item).Redone
+		if _, ok := item.(*structs.Item); nextId != nil && ok {
+			continue
+		}
+		break
+	}
+	return item, diff
+}
+
+func FindIndexCleanStart(transaction *Transaction, strs []structs.IAbstractStruct, clock uint64) uint {
+	var index = FindIndexSS(strs, clock)
+	var str = strs[index]
+	item, ok := str.(*structs.Item)
+	if str.ID().Clock < clock && ok {
+		tmp := []structs.IAbstractStruct{item.SplitItem(transaction, clock-item.Id.Clock)}
+		strs = append(strs[:index], append(tmp, strs[index+1:]...)...)
+		return index + 1
+	}
+
+	return index
 }
 
 func insert(arr []structs.IAbstractStruct, index uint, item *structs.Item) []structs.IAbstractStruct {

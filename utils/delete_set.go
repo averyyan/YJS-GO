@@ -194,6 +194,16 @@ func (ds *DeleteSet) FindIndexSS(dis []*DeleteItem, clock uint64) uint64 {
 	return 0
 }
 
+// IterateDeletedStructs Iterate over all structs that the DeleteSet gc'd.
+func (ds *DeleteSet) IterateDeletedStructs(tr *Transaction, fun func(abstractStruct structs.IAbstractStruct) bool) {
+	for k, v := range ds.Clients {
+		var structs = tr.Doc.Store.Clients[k]
+		for _, del := range v {
+			tr.Doc.Store.IterateStructs(tr, structs, del.Clock, del.Length, fun)
+		}
+	}
+}
+
 func TryToMergeWithLeft(strs []structs.IAbstractStruct, pos int) {
 	var left = strs[pos-1]
 	var right = strs[pos]
