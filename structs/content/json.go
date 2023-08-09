@@ -44,17 +44,17 @@ func ReadJson(decoder utils.IUpdateDecoder) (*Json, error) {
 	return NewJson(content), nil
 }
 
-func (j Json) Copy() structs.IContent {
+func (j Json) Copy() structs.IContentExt {
 	return NewJson(j.Content)
 }
 
-func (j Json) Splice(offset uint64) structs.IContent {
+func (j Json) Splice(offset uint64) structs.IContentExt {
 	var right = NewJson(j.Content[int(offset) : len(j.Content)-int(offset)])
 	j.Content = append(j.Content[0:offset], j.Content[len(j.Content)-int(offset):]...)
 	return right
 }
 
-func (j Json) MergeWith(right structs.IContent) bool {
+func (j Json) MergeWith(right structs.IContentExt) bool {
 	// Debug.Assert(right is ContentJson)
 	j.Content = append(j.Content, right.GetContent().([]any)...)
 	return true

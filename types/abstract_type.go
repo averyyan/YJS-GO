@@ -29,18 +29,18 @@ type AbstractType struct {
 	first  *structs.Item
 }
 
-func (at AbstractType) Integrate(doc *utils.YDoc, item *structs.Item) {
+func (at *AbstractType) Integrate(doc *utils.YDoc, item *structs.Item) {
 	at.Doc = doc
 	at.Item = item
 }
 
 // CallObserver Creates YEvent and calls all type observers.
 // Must be implemented by each type.
-func (at AbstractType) CallObserver(transaction *utils.Transaction, subs map[string]struct{}) {
+func (at *AbstractType) CallObserver(transaction *utils.Transaction, subs map[string]struct{}) {
 	// Do nothing.
 }
 
-func (at AbstractType) CallDeepEventHandlerListeners(events []*utils.YEvent, transaction *utils.Transaction) {
+func (at *AbstractType) CallDeepEventHandlerListeners(events []*utils.YEvent, transaction *utils.Transaction) {
 	if at.DeepEventHandler != nil {
 		at.DeepEventHandler(&YDeepEventArgs{
 			Events:      events,
@@ -49,8 +49,12 @@ func (at AbstractType) CallDeepEventHandlerListeners(events []*utils.YEvent, tra
 	}
 }
 
-func (at AbstractType) Write(utils.IUpdateEncoder) {
+func (at *AbstractType) Write(utils.IUpdateEncoder) {
 	fmt.Printf("not implement")
+}
+
+func (at *AbstractType) FindRootTypeKey() string {
+	return at.Doc.FindRootTypeKey(at)
 }
 
 type YEventArgs struct {

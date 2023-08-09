@@ -5,9 +5,9 @@ import (
 )
 
 type IContent interface {
-	Copy() IContent
-	Splice(offset uint64) IContent
-	MergeWith(right IContent) bool
+	Copy() IContentExt
+	Splice(offset uint64) IContentExt
+	MergeWith(right IContentExt) bool
 	GetContent() any
 	GetLength() int
 	Countable() bool

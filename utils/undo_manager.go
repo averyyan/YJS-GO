@@ -2,6 +2,7 @@ package utils
 
 import (
 	"container/list"
+	"reflect"
 	"time"
 
 	"YJS-GO/structs"
@@ -11,18 +12,16 @@ import (
 type StackItem struct {
 	BeforeState map[uint64]uint64
 	AfterState  map[uint64]uint64
-	Meta        map[string]interface{}
-	DeleteSet   DeleteSet
+	Meta        map[string]any
+	DeleteSet   *DeleteSet
 }
 
-func NewStackItem(BeforeState map[uint64]uint64,
-	AfterState map[uint64]uint64,
-	Meta map[string]interface{},
-	ds DeleteSet) *StackItem {
+func NewStackItem(ds *DeleteSet, BeforeState map[uint64]uint64,
+	AfterState map[uint64]uint64) *StackItem {
 	return &StackItem{
 		BeforeState: BeforeState,
 		AfterState:  AfterState,
-		Meta:        Meta,
+		Meta:        map[string]any{},
 		DeleteSet:   ds,
 	}
 }
@@ -44,35 +43,127 @@ type StackEventArgs struct {
 	Origin             any
 }
 
+// UndoManager Fires 'stack-item-added' event when a stack item was added to either the undo- or
+// the redo-stack. You may store additional stack information via the metadata property
+// on 'event.stackItem.meta' (it is a collection of metadata properties).
+// Fires 'stack-item-popped' event when a stack item was popped from either the undo- or
+// the redo-stack. You may restore the saved stack information from 'event.stackItem.Meta'.
 type UndoManager struct {
-	Scope          []*types.AbstractType
-	DeleteFilter   func(*structs.Item) bool
-	TrackedOrigins map[any]struct {
-	}
+	Scope           []*types.AbstractType
+	DeleteFilter    func(*structs.Item) bool
+	TrackedOrigins  map[any]struct{}
 	UndoStack       *list.List
 	RedoStack       *list.List
 	Undoing         bool
 	Redoing         bool
-	Doc             YDoc
+	Doc             *YDoc
 	LastChange      time.Time
 	CaptureTimeout  uint64
 	StackItemAdded  EventHandler
 	StackItemPopped EventHandler
 }
 
-func NewUndoManager() *UndoManager {
-	return &UndoManager{
-		Scope:          nil,
-		DeleteFilter:   nil,
-		TrackedOrigins: nil,
+func (m *UndoManager) OnAfterTransaction(transaction *Transaction) {
+	// Only track certain transactions.
+	var exist bool
+	for _, abstractType := range m.Scope {
+		_, ok := transaction.ChangedParentTypes[abstractType]
+		if ok {
+			exist = true
+			break
+		}
+	}
+	var assignable bool
+	for to := range m.TrackedOrigins {
+		if reflect.TypeOf(to).AssignableTo(reflect.TypeOf(transaction.Origin)) {
+			assignable = true
+			break
+		}
+	}
+
+	if _, tmpOk := m.TrackedOrigins[transaction.Origin]; !exist || tmpOk && (transaction.Origin == nil || !assignable) {
+		return
+	}
+
+	var undoing, redoing = m.Undoing, m.Redoing
+	var stack = m.UndoStack
+	if undoing {
+		stack = m.RedoStack
+	}
+
+	if undoing {
+		// Next undo should not be appended to last stack item.
+		m.stopCapturing()
+	} else if !redoing {
+		// Neither undoing nor redoing: delete redoStack.
+		m.RedoStack = list.New()
+	}
+
+	var beforeState, afterState = transaction.BeforeState, transaction.AfterState
+
+	var now = time.Now()
+	if time.Now().Sub(m.LastChange).Milliseconds() < int64(m.CaptureTimeout) && stack.Len() > 0 && !undoing && !redoing {
+		// Append change to last stack op.
+		var lastOp = stack.Back().Value.(*StackItem)
+		lastOp.DeleteSet = NewDeleteSetWithArray([]*DeleteSet{lastOp.DeleteSet, transaction.DeleteSet})
+		lastOp.AfterState = afterState
+	} else {
+		// Create a new stack op.
+		var item = NewStackItem(transaction.DeleteSet, beforeState, afterState)
+		stack.PushBack(item)
+	}
+	if !undoing && !redoing {
+		m.LastChange = now
+	}
+	// Make sure that deleted structs are not GC'd.
+	transaction.DeleteSet.IterateDeletedStructs(transaction, func(i structs.IAbstractStruct) bool {
+		item, ok := i.(*structs.Item)
+		var exist bool
+		for _, abstractType := range m.Scope {
+			if IsParentOf(abstractType, item) {
+				exist = true
+				break
+			}
+		}
+		if ok && exist {
+			item.KeepItemAndParents(true)
+		}
+		return true
+	})
+
+	if m.StackItemAdded != nil {
+		opType := undo
+		if undoing {
+			opType = redo
+		}
+		m.StackItemAdded(NewStackEventArgs(stack.Back().Value.(*StackItem), opType, transaction.ChangedParentTypes, transaction.Origin))
+	}
+}
+
+func NewUndoManager(typeScopes []*types.AbstractType, captureTimeout uint64,
+	deleteFilter func(*structs.Item) bool,
+	trackedOrigins map[any]struct{}) *UndoManager {
+	t := &UndoManager{
+		Scope:          typeScopes,
+		DeleteFilter:   func(item *structs.Item) bool { return true },
+		TrackedOrigins: map[any]struct{}{},
 		UndoStack:      list.New(),
 		RedoStack:      list.New(),
 		Undoing:        false,
 		Redoing:        false,
-		Doc:            YDoc{},
-		LastChange:     time.Time{},
-		CaptureTimeout: 0,
+		Doc:            typeScopes[0].Doc,
+		LastChange:     time.Now().Add(-1 * 100 * 12 * 31 * 24 * time.Hour),
+		CaptureTimeout: captureTimeout,
 	}
+	if deleteFilter != nil {
+		t.DeleteFilter = deleteFilter
+	}
+	if trackedOrigins != nil {
+		t.TrackedOrigins = trackedOrigins
+	}
+	t.TrackedOrigins[t] = struct{}{}
+	t.Doc.AfterTransaction = t.OnAfterTransaction
+	return t
 }
 
 func (m *UndoManager) GetCount() uint64 {
@@ -89,6 +180,7 @@ func (m *UndoManager) Clear() {
 					for _, abstractType := range m.Scope {
 						if IsParentOf(abstractType, item) {
 							exist = true
+							break
 						}
 					}
 					if ok && exist {
@@ -113,7 +205,7 @@ func (m *UndoManager) Clear() {
 // StopCapturing UndoManager merges Undo-StackItem if they are created within time-gap
 // smaller than 'captureTimeout'. Call this method so that the next StackItem
 // won't be merged.
-func (m *UndoManager) StopCapturing() {
+func (m *UndoManager) stopCapturing() {
 	//            _lastChange = DateTime.MinValue;
 	m.LastChange = time.Now().Add(-1 * 100 * 12 * 31 * 24 * time.Hour)
 }
@@ -129,12 +221,23 @@ func (m *UndoManager) Undo() *StackItem {
 	return nil
 }
 
+func (m *UndoManager) Redo() *StackItem {
+	m.Redoing = true
+
+	if res, err := m.PopStackItem(m.RedoStack, redo); err != nil {
+		m.Redoing = false
+	} else {
+		return res
+	}
+	return nil
+}
+
 func (m *UndoManager) PopStackItem(stack *list.List, operationType OperationType) (*StackItem, error) {
-	var result *StackItem
-
-	// Keep a reference to the transaction so we can fire the event with the 'changedParentTypes'.
-	var tr *Transaction
-
+	var (
+		result *StackItem
+		tr     *Transaction
+	)
+	// Keep a reference to the transaction, so we can fire the event with the 'changedParentTypes'.
 	m.Doc.Transact(func(transaction *Transaction) {
 		tr = transaction
 
@@ -152,47 +255,44 @@ func (m *UndoManager) PopStackItem(stack *list.List, operationType OperationType
 					startClock = 0
 				}
 
-				var len = endClock - startClock
+				var clockLen = endClock - startClock
 				var strs = m.Doc.Store.Clients[client]
-
-				if startClock != endClock {
-					// Make sure strs don't overlap with the range of created operations [stackItem.start, stackItem.start + stackItem.end).
-					// This must be executed before deleted strs are iterated.
+				if startClock == endClock {
+					continue
+				}
+				// Make sure strs don't overlap with the range of created operations [stackItem.start, stackItem.start + stackItem.end).
+				// This must be executed before deleted strs are iterated.
+				m.Doc.Store.GetItemCleanStart(transaction, &ID{client, startClock})
+				if endClock < m.Doc.Store.GetState(client) {
 					m.Doc.Store.GetItemCleanStart(transaction, &ID{client, startClock})
-
-					if endClock < m.Doc.Store.GetState(client) {
-						m.Doc.Store.GetItemCleanStart(transaction, &ID{client, startClock})
-					}
-
-					m.Doc.Store.IterateStructs(transaction, strs, startClock, len, func(str structs.IAbstractStruct) bool {
-						if it, ok := str.(*structs.Item); ok {
-							if it.Redone != nil {
-								var item, diff = m.Doc.Store.FollowRedone(str.ID())
-
-								if diff > 0 {
-									item = m.Doc.Store.GetItemCleanStart(transaction, &ID{item.ID().Client,
-										item.ID().Clock + diff})
-								}
-
-								if item.GetLength() > len {
-									m.Doc.Store.GetItemCleanStart(transaction, &ID{item.ID().Client, endClock})
-								}
-
-								str, it = item.(*structs.Item), item.(*structs.Item)
+				}
+				m.Doc.Store.IterateStructs(transaction, strs, startClock, clockLen, func(str structs.IAbstractStruct) bool {
+					if it, ok := str.(*structs.Item); ok {
+						if it.Redone != nil {
+							var item, diff = m.Doc.Store.FollowRedone(str.ID())
+							if diff > 0 {
+								item = m.Doc.Store.GetItemCleanStart(transaction, &ID{item.ID().Client,
+									item.ID().Clock + diff})
 							}
-							var exist bool
-							for _, abstractType := range m.Scope {
-								if IsParentOf(abstractType, it) {
-									exist = true
-								}
+							if item.GetLength() > clockLen {
+								m.Doc.Store.GetItemCleanStart(transaction, &ID{item.ID().Client, endClock})
 							}
-							if !it.Deleted && exist {
-								itemsToDelete = append(itemsToDelete, it)
+							str, it = item.(*structs.Item), item.(*structs.Item)
+						}
+						var exist bool
+						for _, abstractType := range m.Scope {
+							if IsParentOf(abstractType, it) {
+								exist = true
+								break
 							}
 						}
-						return true
-					})
-				}
+						if !it.Deleted && exist {
+							itemsToDelete = append(itemsToDelete, it)
+						}
+					}
+					return true
+				})
+
 			}
 
 			stackItem.DeleteSet.IterateDeletedStructs(transaction, func(str structs.IAbstractStruct) bool {
@@ -216,6 +316,7 @@ func (m *UndoManager) PopStackItem(stack *list.List, operationType OperationType
 				for _, abstractType := range m.Scope {
 					if IsParentOf(abstractType, item) {
 						exist = true
+						break
 					}
 				}
 				// Never redo structs in [stackItem.start, stackItem.start + stackItem.end), because they were created and deleted in the same capture interval.

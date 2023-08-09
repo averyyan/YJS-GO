@@ -17,8 +17,8 @@ type IUpdateEncoder interface {
 	IDSEncoder
 	Writer() *bufio.Writer
 
-	WriteLeftId(id ID)
-	WriteRightId(id ID)
+	WriteLeftId(id *ID)
+	WriteRightId(id *ID)
 
 	// WriteClient NOTE: Use 'writeClient' and 'writeClock' instead of writeID if possible.
 	WriteClient(client uint64)

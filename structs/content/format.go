@@ -28,16 +28,16 @@ func ReadFormat(decoder utils.IUpdateDecoder) (*Format, error) {
 	return NewFormat(key, value), nil
 }
 
-func (f Format) Copy() structs.IContent {
+func (f Format) Copy() structs.IContentExt {
 	return NewFormat(f.Key, f.Value)
 }
 
-func (f Format) Splice(offset uint64) structs.IContent {
+func (f Format) Splice(offset uint64) structs.IContentExt {
 	// Do nothing.
 	return nil
 }
 
-func (f Format) MergeWith(right structs.IContent) bool {
+func (f Format) MergeWith(right structs.IContentExt) bool {
 	return false
 }
 
@@ -71,7 +71,7 @@ func (f Format) Delete(transaction *utils.Transaction) {
 
 func (f Format) Integrate(transaction *utils.Transaction, item *structs.Item) {
 	// Search markers are currently unsupported for rich text documents.
-	(item.Parent.(types.YArrayBase)).ClearSearchMarkers()
+	item.Parent.(*types.YArrayBase).ClearSearchMarkers()
 }
 
 func (f Format) GetRef() int {

@@ -50,12 +50,12 @@ func (u UpdateEncoderV2) Writer() *bufio.Writer {
 	panic("implement me")
 }
 
-func (u UpdateEncoderV2) WriteLeftId(id ID) {
+func (u UpdateEncoderV2) WriteLeftId(id *ID) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (u UpdateEncoderV2) WriteRightId(id ID) {
+func (u UpdateEncoderV2) WriteRightId(id *ID) {
 	// TODO implement me
 	panic("implement me")
 }

@@ -40,15 +40,15 @@ func ReadDoc(decoder utils.IUpdateDecoder) (*Doc, error) {
 	return NewDoc(utils.NewDoc(opts)), nil
 }
 
-func (d Doc) Copy() structs.IContent {
+func (d Doc) Copy() structs.IContentExt {
 	return NewDoc(d.Doc)
 }
 
-func (d Doc) Splice(offset uint64) structs.IContent {
+func (d Doc) Splice(offset uint64) structs.IContentExt {
 	return nil
 }
 
-func (d Doc) MergeWith(right structs.IContent) bool {
+func (d Doc) MergeWith(right structs.IContentExt) bool {
 	return false
 }
 

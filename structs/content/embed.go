@@ -26,16 +26,16 @@ func ReadEmbed(decoder utils.IUpdateDecoder) (*Embed, error) {
 	return NewEmbed(content), nil
 }
 
-func (e Embed) Copy() structs.IContent {
+func (e Embed) Copy() structs.IContentExt {
 	return NewEmbed(e.Embed)
 }
 
-func (e Embed) Splice(offset uint64) structs.IContent {
+func (e Embed) Splice(offset uint64) structs.IContentExt {
 	// Do nothing.
 	return nil
 }
 
-func (e Embed) MergeWith(right structs.IContent) bool {
+func (e Embed) MergeWith(right structs.IContentExt) bool {
 	return false
 }
 

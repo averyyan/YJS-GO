@@ -28,16 +28,16 @@ func ReadBinary(decoder utils.IUpdateDecoder) (*Binary, error) {
 	return NewBinary(content), nil
 }
 
-func (b Binary) Copy() structs.IContent {
+func (b Binary) Copy() structs.IContentExt {
 	return NewBinary(b.Content)
 }
 
-func (b Binary) Splice(offset uint64) structs.IContent {
+func (b Binary) Splice(offset uint64) structs.IContentExt {
 	// do nothing
 	return nil
 }
 
-func (b Binary) MergeWith(right structs.IContent) bool {
+func (b Binary) MergeWith(right structs.IContentExt) bool {
 	return false
 }
 

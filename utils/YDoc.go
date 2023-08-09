@@ -227,6 +227,16 @@ func (d *YDoc) CloneOptionsWithNewGuid() *YDocOptions {
 	return newOpts
 }
 
+func (d *YDoc) FindRootTypeKey(Type *types.AbstractType) string {
+	for s, abstractType := range d.share {
+		if Type != nil && Type == abstractType {
+			return s
+		}
+	}
+	// throw new Exception()
+	return ""
+}
+
 func writeStateVector(encoder IDSEncoder) {
 	WriteStateVector(encoder, Store.GetStateVector())
 

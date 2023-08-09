@@ -3,6 +3,8 @@ package utils
 import (
 	"bufio"
 	"io"
+
+	"YJS-GO/lib0/decoder"
 )
 
 var a IDSDecoder = (*DSDecoderV2)(nil)
@@ -38,11 +40,42 @@ var _ IUpdateDecoder = (*UpdateDecoderV2)(nil)
 
 type UpdateDecoderV2 struct {
 	DSDecoderV2
+	Keys              []string
+	KeyClockDecoder   decoder.IntDiffOptRleDecoder
+	ClientDecoder     decoder.UintOptRleDecoder
+	LeftClockDecoder  decoder.IntDiffOptRleDecoder
+	RightClockDecoder decoder.IntDiffOptRleDecoder
+	InfoDecoder       decoder.RleDecoder
+	StringDecoder     decoder.StringDecoder
+	ParentInfoDecoder decoder.RleDecoder
+	TypeRefDecoder    decoder.UintOptRleDecoder
+	LengthDecoder     decoder.UintOptRleDecoder
+}
+
+func NewUpdateDecoderV2(reader io.Reader) *UpdateDecoderV2 {
+	a := bufio.NewReader(reader)
+	// Read feature flag - currently unused.
+	_, err := a.ReadByte()
+	if err != nil {
+		panic("get UpdateDecoderV2 panic")
+	}
+	return &UpdateDecoderV2{
+		DSDecoderV2:       DSDecoderV2{reader: a},
+		Keys:              []string{},
+		KeyClockDecoder:   decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		ClientDecoder:     decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		LeftClockDecoder:  decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		RightClockDecoder: decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		InfoDecoder:       decoder.RleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		StringDecoder:     decoder.StringDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		ParentInfoDecoder: decoder.RleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		TypeRefDecoder:    decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		LengthDecoder:     decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+	}
 }
 
 func (u *UpdateDecoderV2) ReadLeftId() *ID {
-	// TODO implement me
-	panic("implement me")
+	return &ID{u.ClientDecoder.Read(), u.LeftClockDecoder.Read()}
 }
 
 func (u *UpdateDecoderV2) ReadRightId() *ID {
@@ -100,6 +133,6 @@ func (u *UpdateDecoderV2) ReadJson() any {
 	panic("implement me")
 }
 
-func NewUpdateDecoderV2(reader io.Reader) *UpdateDecoderV2 {
-	return &UpdateDecoderV2{}
+func (u *UpdateDecoderV2) CheckDisposed() bool {
+	return false
 }

@@ -3,6 +3,7 @@ package structs
 import (
 	"reflect"
 
+	"YJS-GO/lib0"
 	"YJS-GO/structs/content"
 	"YJS-GO/types"
 	"YJS-GO/utils"
@@ -35,7 +36,7 @@ type Item struct {
 	// Otherwise, it is 'parent._map'.
 	ParentSub string
 	Redone    *utils.ID
-	Content   IContent
+	Content   IContentExt
 	Marker    bool
 	Keep      bool
 	Countable bool
@@ -92,7 +93,7 @@ func (i *Item) Delete(transaction *utils.Transaction) {
 		i.MarkDeleted()
 		transaction.DeleteSet.Add(i.Id.Client, i.Id.Clock, uint64(i.Length))
 		transaction.AddChangedTypeToTransaction(parent.(*types.AbstractType), i.ParentSub)
-		i.Content.(IContentExt).Delete(transaction)
+		i.Content.Delete(transaction)
 	}
 }
 
@@ -101,7 +102,7 @@ func (i *Item) Integrate(transaction *utils.Transaction, offset int) {
 		i.Id = &utils.ID{Client: i.Id.Client, Clock: i.Id.Clock + uint64(offset)}
 		i.Left = transaction.Doc.Store.GetItemCleanEnd(transaction, &utils.ID{Client: i.Id.Client, Clock: i.Id.Clock - 1})
 		i.LeftOrigin = i.Left.(*Item).LastId
-		i.Content = i.Content.(IContentExt).Splice(uint64(offset))
+		i.Content = i.Content.Splice(uint64(offset))
 		i.Length -= uint64(offset)
 	}
 
@@ -240,8 +241,56 @@ func (i *Item) GetMissing(transaction *utils.Transaction, store *utils.StructSto
 }
 
 func (i *Item) Write(encoder utils.IUpdateEncoder, offset int) {
-	// TODO implement me
-	panic("implement me")
+	var origin = &utils.ID{Client: i.Id.Clock, Clock: i.Id.Clock + uint64(offset) - 1}
+	if offset <= 0 {
+		origin = i.LeftOrigin
+	}
+	var rightOrigin = i.RightOrigin
+	var parentSub = i.ParentSub
+	b := uint(0)
+	if origin != nil {
+		b = lib0.Bit8
+	}
+	c := uint(0)
+	if rightOrigin != nil {
+		c = lib0.Bit7
+	}
+	d := uint(0)
+	if parentSub != "" {
+		d = lib0.Bit6
+	}
+	var info = uint(i.Content.GetRef())&lib0.Bits5 | b | c | d
+
+	encoder.WriteInfo(uint8(info))
+
+	if origin != nil {
+		encoder.WriteLeftId(origin)
+	}
+
+	if rightOrigin != nil {
+		encoder.WriteRightId(rightOrigin)
+	}
+
+	if origin == nil && rightOrigin == nil {
+		var parent = i.Parent
+		var parentItem = parent.(*types.AbstractType).Item
+		if parentItem == nil {
+			// parent type on y._map.
+			// find the correct key
+			var yKey = parent.(*types.AbstractType).FindRootTypeKey()
+			encoder.WriteParentInfo(true)
+			encoder.WriteString(yKey)
+		} else {
+			encoder.WriteParentInfo(false)
+			encoder.WriteLeftId(parentItem.Id)
+		}
+
+		if parentSub != "" {
+			encoder.WriteString(parentSub)
+		}
+	}
+
+	i.Content.Write(encoder, offset)
 }
 
 func (i *Item) SetMarker(value bool) {
@@ -345,7 +394,8 @@ func (i *Item) SplitItem(transaction *utils.Transaction, diff uint64) *Item {
 	return rightItem
 }
 
-func (i *Item) Gc(store *utils.StructStore, parentGCd bool) {
+func (i *Item) Gc(store *utils.StructStore,
+	parentGCd bool) {
 	if !i.Deleted {
 		return
 		// throw new InvalidOperationException();
@@ -371,7 +421,8 @@ func (i *Item) KeepItemAndParents(value bool) {
 	}
 }
 
-func NewItem(id *utils.ID, left IAbstractStruct, leftOrigin *utils.ID, right IAbstractStruct, rightOrigin *utils.ID, parent any, parentSub string, content IContent) *Item {
+func NewItem(id *utils.ID, left IAbstractStruct, leftOrigin *utils.ID, right IAbstractStruct, rightOrigin *utils.ID,
+	parent any, parentSub string, content IContent) *Item {
 	t := &Item{}
 	t.Id = id
 	t.Length = uint64(content.GetLength())

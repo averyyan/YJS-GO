@@ -25,32 +25,34 @@ func (t Type) SetRef(i int) {
 
 func ReadType(decoder utils.IUpdateDecoder) (*Type, error) {
 	var typeRef = decoder.ReadTypeRef()
+	var tmp any
 	switch typeRef {
 	case types.YArrayRefId:
-		var arr = types.ReadArr(decoder)
-		return NewType(arr), nil
+		tmp = types.ReadArr(decoder)
 	case types.YMapRefId:
-		var m = types.ReadMap(decoder)
-		return NewType(m), nil
+		tmp = types.ReadMap(decoder)
 	case types.YTextRefId:
-		var text = types.ReadText(decoder)
+		tmp = types.ReadText(decoder)
+	case types.YXmlElementRefID:
+		var text = types.ReadXmlElement(decoder)
 		return NewType(text), nil
 	default:
 		// throw new NotImplementedException($"Type {typeRef} not implemented")
 		return nil, errors.New("Type {typeRef} not implemented")
 	}
+	return NewType(tmp), nil
 }
 
-func (t Type) Copy() structs.IContent {
+func (t Type) Copy() structs.IContentExt {
 	return NewType(t.GetType())
 }
 
-func (t Type) Splice(offset uint64) structs.IContent {
+func (t Type) Splice(offset uint64) structs.IContentExt {
 	// Do nothing.
 	return nil
 }
 
-func (t Type) MergeWith(right structs.IContent) bool {
+func (t Type) MergeWith(right structs.IContentExt) bool {
 	return false
 }
 

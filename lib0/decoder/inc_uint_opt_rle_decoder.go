@@ -15,7 +15,7 @@ type IncUintOptRleDecoder struct {
 	state     uint64
 	count     uint64
 	leaveOpen bool
-	reader    io.Reader
+	reader    *bufio.Reader
 	Disposed  bool
 }
 
@@ -53,7 +53,7 @@ func (i IncUintOptRleDecoder) ReadV() any {
 	panic("implement me")
 }
 
-func NewIncUintOptRleDecoder(input io.Reader, leaveOpen bool) *IncUintOptRleDecoder {
+func NewIncUintOptRleDecoder(input *bufio.Reader, leaveOpen bool) *IncUintOptRleDecoder {
 	return &IncUintOptRleDecoder{
 		leaveOpen: leaveOpen,
 		reader:    input,
@@ -86,7 +86,7 @@ func ReadVarInt(reader io.Reader) (uint, uint, error) {
 		len += 7
 
 		if uint(r) < lib0.Bit8 {
-			return sign * num, sign, 0
+			return sign * num, sign, nil
 		}
 
 		if len > 41 {

@@ -30,11 +30,11 @@ func ReadString(decoder utils.IUpdateDecoder) (*String, error) {
 	return NewString(decoder.ReadString()), nil
 }
 
-func (s String) Copy() structs.IContent {
+func (s String) Copy() structs.IContentExt {
 	return NewString(s.GetString())
 }
 
-func (s String) Splice(offset uint64) structs.IContent {
+func (s String) Splice(offset uint64) structs.IContentExt {
 	var t = s.content[int(offset) : len(s.content)-int(offset)]
 	var sb = &strings.Builder{}
 	for i := 0; i < len(t); i++ {
@@ -58,7 +58,7 @@ func (s String) Splice(offset uint64) structs.IContent {
 	return right
 }
 
-func (s String) MergeWith(right structs.IContent) bool {
+func (s String) MergeWith(right structs.IContentExt) bool {
 	// Debug.Assert(right is ContentString);
 	s.content = append(s.content, (right.(String)).content)
 	return true

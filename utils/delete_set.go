@@ -32,6 +32,12 @@ func NewDeleteSet(ss *StructStore) *DeleteSet {
 	return ds
 }
 
+func NewDeleteSetWithArray(dss []*DeleteSet) *DeleteSet {
+	ds := &DeleteSet{}
+	ds.MergeDeleteSets(dss)
+	return ds
+}
+
 func (ds *DeleteSet) CreateDeleteSetFromStructStore(ss *StructStore) {
 	for k, v := range ss.Clients {
 		var dsItems []*DeleteItem
@@ -202,6 +208,29 @@ func (ds *DeleteSet) IterateDeletedStructs(tr *Transaction, fun func(abstractStr
 			tr.Doc.Store.IterateStructs(tr, structs, del.Clock, del.Length, fun)
 		}
 	}
+}
+
+func (ds *DeleteSet) MergeDeleteSets(dss []*DeleteSet) {
+	for dssI := 0; dssI < len(dss); dssI++ {
+		for client, delsLeft := range dss[dssI].Clients {
+
+			if _, ok := ds.Clients[client]; !ok {
+				// Write all missing keys from current ds and all following.
+				// If merged already contains 'client' current ds has already been added.
+				var dels []*DeleteItem
+				copy(dels, delsLeft)
+
+				for i := dssI + 1; i < len(dss); i++ {
+					if appends, ok := dss[i].Clients[client]; ok {
+						dels = append(dels, appends...)
+					}
+				}
+				ds.Clients[client] = dels
+			}
+		}
+	}
+
+	ds.SortAndMergeDeleteSet()
 }
 
 func TryToMergeWithLeft(strs []structs.IAbstractStruct, pos int) {

@@ -26,7 +26,7 @@ func (d Deleted) SetRef(i int) {
 	// do nothing
 }
 
-func (d Deleted) MergeWith(right structs.IContent) bool {
+func (d Deleted) MergeWith(right structs.IContentExt) bool {
 	// Debug.Assert(right is ContentDeleted);
 	if reflect.TypeOf(right) != reflect.TypeOf(Deleted{}) {
 		return false
@@ -40,11 +40,11 @@ func ReadDeleted(decoder utils.IUpdateDecoder) (*Deleted, error) {
 	return NewDeleted(int(length)), nil
 }
 
-func (d Deleted) Copy() structs.IContent {
+func (d Deleted) Copy() structs.IContentExt {
 	return NewDeleted(int(d.Length))
 }
 
-func (d Deleted) Splice(offset uint64) structs.IContent {
+func (d Deleted) Splice(offset uint64) structs.IContentExt {
 	var right = NewDeleted(int(d.Length - offset))
 	d.Length = offset
 	return right

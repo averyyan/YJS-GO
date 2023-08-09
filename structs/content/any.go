@@ -39,17 +39,17 @@ func ReadAny(decoder utils.IUpdateDecoder) (*Any, error) {
 	return NewAny(cs), nil
 }
 
-func (a Any) Copy() structs.IContent {
+func (a Any) Copy() structs.IContentExt {
 	return NewAny(a.Content)
 }
 
-func (a Any) Splice(offset uint64) structs.IContent {
+func (a Any) Splice(offset uint64) structs.IContentExt {
 	var right = NewAny(a.Content[offset : len(a.Content)-int(offset)])
 	a.Content = append(a.Content[:offset], a.Content[len(a.Content)-int(offset):])
 	return right
 }
 
-func (a Any) MergeWith(right structs.IContent) bool {
+func (a Any) MergeWith(right structs.IContentExt) bool {
 	a.Content = append(a.Content, (right.(*Any)).Content)
 	return true
 }
