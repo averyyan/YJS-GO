@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
+	"math"
+	"unsafe"
 )
 
 type VarReader struct {
@@ -15,6 +18,7 @@ func New(reader io.Reader) *VarReader {
 	return &VarReader{Reader: bufio.NewReader(reader)}
 }
 
+// ReadVarString Reads a variable length string.
 func ReadVarString(reader *bufio.Reader) string {
 	remainingLen, err := binary.ReadUvarint(reader)
 	if err != nil || remainingLen == 0 {
@@ -35,13 +39,15 @@ func ReadVarString(reader *bufio.Reader) string {
 	return string(bytes.Runes(readBytes))
 }
 
-func ReadVarUint8ArrayAsStream(reader *bufio.Reader) *bufio.Reader {
+// ReadVarUint8ArrayAsReader Reads variable length byte array as a readable <see cref="Memoryreader"/>.
+func ReadVarUint8ArrayAsReader(reader *bufio.Reader) *bufio.Reader {
 	var data = ReadVarUint8Array(reader)
 	return bufio.NewReader(bytes.NewReader(data))
 }
 
+// ReadVarUint8Array Reads a variable length byte array.
 func ReadVarUint8Array(reader *bufio.Reader) []byte {
-	// uint len = stream.ReadVarUint();
+	// uint len = reader.ReadVarUint();
 	length, err := binary.ReadUvarint(reader)
 	if err != nil {
 		return nil
@@ -54,297 +60,204 @@ func ReadVarUint8Array(reader *bufio.Reader) []byte {
 	return ret
 }
 
-// Contains <see cref="Stream"/> extensions compatible with the <c>lib0</c>:
+// ReadUint16 Contains <see cref="reader"/> extensions compatible with the <c>lib0</c>:
 // <see href="https://github.com/dmonad/lib0"/>.
-
 // Reads two bytes as an unsigned integer.
-
-func ReadUint16(reader *bufio.Reader) ushort {
-	return (ushort)(stream._ReadByte() + (stream._ReadByte() << 8))
+func ReadUint16(reader *bufio.Reader) uint16 {
+	a, errA := reader.ReadByte()
+	b, errB := reader.ReadByte()
+	if errA != nil || errB != nil {
+		return 0
+	}
+	return (uint16)(a + b<<8)
 }
 
-// Reads four bytes as an unsigned integer.
-
-func ReadUint32(reader *bufio.Reader) uint {
-	return (uint)((stream._ReadByte() + (stream._ReadByte() << 8) + (stream._ReadByte() << 16) + (stream._ReadByte() << 24)) >> 0)
+// ReadUint32 Reads four bytes as an unsigned integer.
+func ReadUint32(reader *bufio.Reader) uint32 {
+	a, errA := reader.ReadByte()
+	b, errB := reader.ReadByte()
+	c, errC := reader.ReadByte()
+	d, errD := reader.ReadByte()
+	if errA != nil || errB != nil || errC != nil || errD != nil {
+		return 0
+	}
+	return (uint32)((a + (b << 8) + (c << 16) + (d << 24)) >> 0)
 }
 
-// Reads unsigned integer (32-bit) with variable length.
+// ReadVarUint Reads unsigned integer (32-bit) with variable length.
 // 1/8th of the storage is used as encoding overhead.
 // * Values &lt; 2^7 are stored in one byte.
 // * Values &lt; 2^14 are stored in two bytes.
-
 // <exception cref="InvalidDataException">Invalid binary format.</exception>
-
 func ReadVarUint(reader *bufio.Reader) uint {
-	uint
-	num = 0
-	int
-	len = 0
+	var num uint = 0
+	var length = 0
 
-	while(true)
-	{
-		byte
-		r = stream._ReadByte()
-		num |= (r & Bits.Bits7) << len
-		len += 7
+	for true {
+		r, err := reader.ReadByte()
+		if err != nil {
+			return 0
+		}
+		num |= (uint(r) & Bits7) << length
+		length += 7
 
-		if r < Bit.Bit8 {
+		if uint(r) < Bit8 {
 			return num
 		}
 
-		if len > 35 {
-			throw
-			new
-			InvalidDataException("Integer out of range.")
+		if length > 35 {
+			// throw new InvalidDataException("Integer out of range.")
 		}
 	}
+	return 0
 }
 
-// Reads a 32-bit variable length signed integer.
+// ReadVarInt Reads a 32-bit variable length signed integer.
 // 1/8th of storage is used as encoding overhead.
 // * Values &lt; 2^7 are stored in one byte.
 // * Values &lt; 2^14 are stored in two bytes.
-
 // <exception cref="InvalidDataException">Invalid binary format.</exception>
+func ReadVarInt(reader *bufio.Reader) (uint, uint, error) {
+	byteReader := bufio.NewReader(reader)
+	r, err := byteReader.ReadByte()
+	if err != nil {
+		return 0, 0, err
+	}
+	var num uint = uint(r) & Bits6
+	var length = 6
+	var sign uint = 1
+	if uint(r)&Bit7 > 0 {
+		sign = -1
+	}
 
-func ReadVarInt(reader *bufio.Reader) (long Value, int Sign) {
-	byte
-	r = stream._ReadByte()
-	uint
-	num = r & Bits.Bits6
-	int
-	len = 6
-	int
-	sign = (r & Bit.Bit7) > 0 ? -1: 1
-
-	if (r & Bit.Bit8) == 0 {
+	if (uint(r) & Bit8) == 0 {
 		// Don't continue reading.
-		return sign * num, sign)
+		return sign * num, sign, nil
 	}
+	for true {
+		r, err := byteReader.ReadByte()
+		if err != nil {
+			return 0, 0, err
+		}
+		num |= (uint(r) & Bits7) << length
+		length += 7
 
-	while(true)
-	{
-		r = stream._ReadByte()
-		num |= (r & Bits.Bits7) << len
-		len += 7
-
-		if r < Bit.Bit8 {
-			return sign * num, sign)
+		if uint(r) < Bit8 {
+			return sign * num, sign, nil
 		}
 
-		if len > 41 {
-			throw
-			new
-			InvalidDataException("Integer out of range")
+		if length > 41 {
+			// throw new InvalidDataException("Integer out of range")
+			return 0, 0, errors.New("Integer out of range")
 		}
 	}
+	return 0, 0, err
 }
 
-// Reads a variable length string.
-
-// <remarks>
-// <see cref="StreamEncodingExtensions.WriteVarUint(Stream, uint)"/> is used to store the length of the string.
-// </remarks>
-
-func ReadVarString(reader *bufio.Reader) string {
-	uint
-	remainingLen = stream.ReadVarUint()
-	if remainingLen == 0 {
-		return string.Empty
-	}
-
-	var data = stream._ReadBytes(int
-	remainingLen)
-
-	var str = Encoding.UTF8.GetString(data)
-	return str
-}
-
-// Reads a variable length byte array.
-
-func ReadVarUint8Array(reader *bufio.Reader) byte[] {
-	uint
-	len = stream.ReadVarUint()
-	return stream._ReadBytes(int
-	len)
-}
-
-// Reads variable length byte array as a readable <see cref="MemoryStream"/>.
-
-func ReadVarUint8ArrayAsStream(reader *bufio.Reader) MemoryStream {
-	var data = stream.ReadVarUint8Array()
-	return new
-	MemoryStream(data, writable: false)
-}
-
-// Decodes data from the stream.
-
+// ReadAny Decodes data from the reader.
 func ReadAny(reader *bufio.Reader) any {
-	byte
-	type = stream._ReadByte()
-	switch
-
-	type
-)
-	{
+	Type, err := reader.ReadByte()
+	if err != nil {
+		return nil
+	}
+	switch uint(Type) {
 	case 119: // String
-	return stream.ReadVarString();
+		return ReadVarString(reader)
 	case 120: // boolean true
-	return true;
+		return true
 	case 121: // boolean false
-	return false;
+		return false
 	case 123: // Float64
-
-	var dBytes = new byte[8];
-	stream._ReadBytes(dBytes);
-
-	if (BitConverter.IsLittleEndian)
-	{
-	Array.Reverse(dBytes);
-	}
-
-	return BitConverter.ToDouble(dBytes, 0);
-
-	Span<byte> dBytes = stackalloc byte[8];
-	stream._ReadBytes(dBytes);
-
-	if (BitConverter.IsLittleEndian)
-	{
-	dBytes.Reverse();
-	}
-
-	return BitConverter.ToDouble(dBytes);
-
+		var dBytes = make([]byte, 8)
+		l, err := reader.Read(dBytes)
+		if err != nil || l != 8 {
+			return nil
+		}
+		if !IsLittleEndian() {
+			dBytes = Reverse(dBytes)
+		}
+		bits := binary.LittleEndian.Uint64(dBytes)
+		return math.Float64frombits(bits)
 	case 124: // Float32
-
-	var fBytes = new byte[4];
-	stream._ReadBytes(fBytes);
-
-	if (BitConverter.IsLittleEndian)
-	{
-	Array.Reverse(fBytes);
-	}
-
-	return BitConverter.ToSingle(fBytes, 0);
-
-	Span<byte> fBytes = stackalloc byte[4];
-	stream._ReadBytes(fBytes);
-
-	if (BitConverter.IsLittleEndian)
-	{
-	fBytes.Reverse();
-	}
-
-	return BitConverter.ToSingle(fBytes);
-
+		var dBytes = make([]byte, 4)
+		l, err := reader.Read(dBytes)
+		if err != nil || l != 4 {
+			return nil
+		}
+		if !IsLittleEndian() {
+			dBytes = Reverse(dBytes)
+		}
+		bits := binary.LittleEndian.Uint32(dBytes)
+		return math.Float32frombits(bits)
 	case 125: // integer
-	return (int)stream.ReadVarInt().Value;
+		_, b, _ := ReadVarInt(reader)
+		return b
 	case 126: // null
 	case 127: // undefined
-	return null;
+		return nil
 	case 116: // ArrayBuffer
-	return stream.ReadVarUint8Array();
+		return ReadVarUint8Array(reader)
 	case 117: // Array<any>
-	{
-	var len = (int)stream.ReadVarUint();
-	var arr = new List<any>(len);
-
-	for (int i = 0; i < len; i++)
-	{
-	arr.Add(stream.ReadAny());
-	}
-
-	return arr;
-	}
+		var length = ReadVarUint(reader)
+		var arr = make([]any, length)
+		for i := 0; uint(i) < length; i++ {
+			arr = append(arr, ReadAny(reader))
+		}
+		return arr
 	case 118: // any (Dictionary<string, any>)
-	{
-	var len = (int)stream.ReadVarUint();
-	var obj = new Dictionary<string, any>(len);
-
-	for (int i = 0; i < len; i++)
-	{
-	var key = stream.ReadVarString();
-	obj[key] = stream.ReadAny();
-	}
-
-	return obj;
-	}
+		var length = ReadVarUint(reader)
+		var obj = make(map[string]any, length)
+		for i := 0; i < int(length); i++ {
+			var key = ReadVarString(reader)
+			obj[key] = ReadAny(reader)
+		}
+		return obj
 	default:
-	throw new InvalidDataException($"Unknown any type: {type}");
+		// throw new InvalidDataException($"Unknown any type: {type}")
 	}
+	return nil
 }
 
-// Reads a byte from the stream and advances the position within the stream by one byte.
-
-// <exception cref="EndOfStreamException">End of stream reached.</exception>
-
-func _ReadByte(reader *bufio.Reader) byte {
-	int
-	v = stream.ReadByte()
-	if v < 0 {
-		throw
-		new
-		EndOfStreamException()
+// Reads a byte from the reader and advances the position within the reader by one byte.
+// <exception cref="EndOfreaderException">End of reader reached.</exception>
+func ReadByte(reader *bufio.Reader) byte {
+	v, err := reader.ReadByte()
+	if err != nil {
+		return v
 	}
-
-	return Convert.ToByte(v)
+	return v
 }
 
-// Reads a sequence of bytes from the current stream and advances the position
-// within the stream by the number of bytes read.
-
-// <exception cref="EndOfStreamException">End of stream reached.</exception>
-
-func _ReadBytes(reader *bufio.Reader, int count) byte[] {
-	Debug.Assert(count >= 0)
-
-	var result = new
-	byte[count]
-	for int
-	i = 0
-	i < count
-	i++)
-	{
-	int v = stream.ReadByte();
-	if (v < 0)
-	{
-	throw new EndOfStreamException();
+// ReadBytes Reads a sequence of bytes from the current reader and advances the position
+// within the reader by the number of bytes read.
+// <exception cref="EndOfreaderException">End of reader reached.</exception>
+func ReadBytes(reader *bufio.Reader, buffer []byte) error {
+	if len(buffer) == 0 {
+		return errors.New("ReadBytes error")
 	}
-
-	result[i] = Convert.ToByte(v);
+	readLength, err := reader.Read(buffer)
+	if len(buffer) != readLength || err != nil {
+		// throw new EndOfreaderException()
+		return errors.New("ReadBytes error")
 	}
-
-	return result
+	return nil
 }
 
-// Reads a sequence of bytes from the current stream and advances the position
-// within the stream by the number of bytes read.
-
-// <exception cref="EndOfStreamException">End of stream reached.</exception>
-
-func _ReadBytes(reader *bufio.Reader, byte []buffer) void {
-	if buffer.Length == 0 {
-		return
+func IsLittleEndian() bool {
+	var value int32 = 1 // 占4byte 转换成16进制 0x00 00 00 01
+	// 大端(16进制)：00 00 00 01
+	// 小端(16进制)：01 00 00 00
+	pointer := unsafe.Pointer(&value)
+	pb := (*byte)(pointer)
+	if *pb != 1 {
+		return false
 	}
-
-	if buffer.Length != stream.Read(buffer, 0, buffer.Length) {
-		throw
-		new
-		EndOfStreamException()
-	}
+	return true
 }
 
-func _ReadBytes(reader *bufio.Reader, Span<byte> buffer) void {
-	if buffer.Length == 0 {
-		return
+func Reverse(bytes []byte) []byte {
+	for i, j := 0, len(bytes)-1; i < j; i, j = i+1, j-1 {
+		bytes[i], bytes[j] = bytes[j], bytes[i]
 	}
-
-	if buffer.Length != stream.Read(buffer) {
-		throw
-		new
-		EndOfStreamException()
-	}
-}
-
+	return bytes
 }

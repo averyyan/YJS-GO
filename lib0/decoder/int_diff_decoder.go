@@ -16,6 +16,6 @@ func (i IntDiffDecoder) Read(p []byte) (n int, err error) {
 
 func (i IntDiffDecoder) ReadV() int {
 
-	i.reader.WriteVarInt(value - _state)
+	WriteVarInt(,i.reader,value - _state)
 	_state = value
 }

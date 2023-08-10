@@ -1,84 +1,101 @@
 package lib0
 
-import "bufio"
+import (
+	"bufio"
+	"encoding/binary"
+	"fmt"
+	"math"
+	"reflect"
+)
 
 // WriteUint16  Writes two bytes as an unsigned unteger.
-func WriteUint16(reader *bufio.Reader, ushort num) {
-	reader.WriteByte((byte)(num & Bits8))
-	reader.WriteByte((byte)((num >> 8) & Bits8))
+func WriteUint16(writer *bufio.Writer, num uint) {
+	binary.Write(writer, binary.LittleEndian, num&Bits8)
+	writer.WriteByte((byte)(num & Bits8))
+	writer.WriteByte((byte)((num >> 8) & Bits8))
 }
 
 // WriteUint32  Writes four bytes as an unsigned integer.
-func WriteUint32(reader *bufio.Reader, num uint64) {
-	for int
-	i = 0
-	i < 4
-	i++)
-	{
-	reader.WriteByte((byte)(num & Bits8));
-	num >>= 8;
+func WriteUint32(writer *bufio.Writer, num uint) {
+	for i := 0; i < 4; i++ {
+		writer.WriteByte((byte)(num & Bits8))
+		num >>= 8
 	}
 }
 
-// Writes a variable length unsigned integer.
-// WriteVarUint  Encodes integers in the range <c>[0, 4294967295] / [0, 0xFFFFFFFF]</c>.
-func WriteVarUint(reader *bufio.Reader, num uint64) {
-	while(num > Bits7)
-	{
-		reader.WriteByte((byte)(Bit.Bit8 | (Bits7 & num)))
+// WriteVarUint Writes a variable length unsigned integer.
+// Encodes integers in the range <c>[0, 4294967295] / [0, 0xFFFFFFFF]</c>.
+func WriteVarUint(writer *bufio.Writer, num uint) {
+	for num > Bits7 {
+		writer.WriteByte((byte)(Bit8 | (Bits7 & num)))
 		num >>= 7
 	}
 
-	reader.WriteByte((byte)(Bits7 & num))
+	writer.WriteByte((byte)(Bits7 & num))
 }
 
-// Writes a variable length integer.
+// WriteVarInt Writes a variable length integer.
 // <br/>
 // Encodes integers in the range <c>[-2147483648, -2147483647]</c>.
 // <br/>
 // We don't use zig-zag encoding because we want to keep the option open
 // to use the same function for <c>BigInt</c> and 53-bit integers (doubles).
 // <br/>
-// WriteVarInt  We use the 7-th bit instead for signalling that this is a negative number.
-func WriteVarInt(reader *bufio.Reader, long num, bool? treatZeroAsNegative = null) {
-	bool
-	isNegative = num == 0 ? (treatZeroAsNegative ?? false): num < 0
+//
+//	We use the 7-th bit instead for signalling that this is a negative number.
+func WriteVarInt(writer *bufio.Writer, num int, treatZeroAsNegative bool) {
+	var isNegative = treatZeroAsNegative
+	if num < 0 {
+		isNegative = true
+	}
 	if isNegative {
 		num = -num
 	}
 
-	//                      |   whether to continue reading   |         is negative         | value.
-	reader.WriteByte((byte)((num > Bits6 ? Bit.Bit8: 0) | (isNegative ? Bit.Bit7: 0) | (Bits6 & num)))
-num >>= 6
+	// |   whether to continue reading   |         is negative         | value.
+	var tmpA uint
+	var tmpB uint
+	if uint(num) > Bits6 {
+		tmpA = Bit8
+	}
+	if isNegative {
+		tmpB = Bit7
+	}
+	// |   whether to continue reading   |         is negative         | value.
+	writer.WriteByte((byte)(tmpA | tmpB | Bit6&uint(num)))
+	num >>= 6
 
-// We don't need to consider the case of num == 0 so we can use a different pattern here than above.
-while (num > 0)
-{
-reader.WriteByte((byte)((num > Bits7 ? Bit.Bit8: 0) | (Bits7 & num)));
-num >>= 7;
-}
+	// We don't need to consider the case of num == 0 so we can use a different pattern here than above.
+	var tmpC uint
+	if uint(num) > Bits7 {
+		tmpC = Bit8
+	}
+	for num > 0 {
+		writer.WriteByte((byte)(tmpC | (Bits7 & uint(num))))
+		num >>= 7
+	}
 }
 
 // WriteVarString  Writes a variable length string.
-func WriteVarString(reader *bufio.Reader, string str) {
-	var data = Encoding.UTF8.GetBytes(str)
-	reader.WriteVarUint8Array(data)
+func WriteVarString(writer *bufio.Writer, str string) {
+	var data = []byte(str)
+	WriteVarUint8Array(writer, data)
 }
 
-// WriteVarUint8Array  Appends a byte array to the reader.
-func WriteVarUint8Array(reader *bufio.Reader, byte []array) {
-	reader.WriteVarUint((uint)
-	array.Length)
-	reader.Write(array, 0, array.Length)
+// WriteVarUint8Array  Appends a byte array to the writer.
+func WriteVarUint8Array(writer *bufio.Writer, array []byte) {
+	WriteVarUint(writer, uint(len(array)))
+	writer.Write(array)
 }
 
-// Encodes data with efficient binary format.
+// WriteAny Encodes data with efficient binary format.
 // <br/>
 // Differences to JSON:
-// * Transforms data to a binary format (not to a string).
-// * Encodes undefined, NaN, and ArrayBuffer (these can't be represented in JSON).
-// * Numbers are efficiently encoded either as a variable length integer, as a 32-bit
-//  float, or as a 64-bit float.
+//   - Transforms data to a binary format (not to a string).
+//   - Encodes undefined, NaN, and ArrayBuffer (these can't be represented in JSON).
+//   - Numbers are efficiently encoded either as a variable length integer, as a 32-bit
+//     float, or as a 64-bit float.
+//
 // <br/>
 // Encoding table:
 // | Data Type                      | Prefix | Encoding method   | Comment                                                        |
@@ -100,110 +117,66 @@ func WriteVarUint8Array(reader *bufio.Reader, byte []array) {
 // We need the first bit for extendability (later we may want to encode the prefix with <see cref="WriteVarUint(BinaryWriter, uint)"/>).
 // The remaining 7 bits are divided as follows:
 // [0-30]   The beginning of the data range is used for custom purposes
-//         (defined by the function that uses this library).
-// WriteAny  [31-127] The end of the data range is used for data encoding.
-func WriteAny(reader *bufio.Reader, o any) {
+//
+//	      (defined by the function that uses this library).
+//	[31-127] The end of the data range is used for data encoding.
+func WriteAny(writer *bufio.Writer, o any) {
 	switch t := o.(type) {
 	case string: // TYPE 119: STRING
-		reader.WriteByte(119)
-		reader.WriteVarString(str)
-		break
+		writer.WriteByte(119)
+		WriteVarString(writer, t)
 	case bool: // TYPE 120/121: boolean (true/false)
-		reader.WriteByte((byte)(t ? 120: 121))
-		break
-	case double d: // TYPE 123: FLOAT64
-		#if NETSTANDARD2_0
-		var dBytes = BitConverter.GetBytes(d)
-		if BitConverter.IsLittleEndian {
-			Array.Reverse(dBytes)
+		var b uint = 121
+		if t {
+			b = 120
 		}
-		reader.WriteByte(123)
-		reader.Write(dBytes, 0, dBytes.Length)
-		break
-		#elif
-		NETSTANDARD2_1
-		Span < byte > dBytes = stackalloc
-		byte[8]
-		if !BitConverter.TryWriteBytes(dBytes, d) {
-			throw
-			new
-			InvalidDataException("Unable to write a double value.")
+		writer.WriteByte((byte)(b))
+	case float64: // TYPE 123: FLOAT64
+		bits := math.Float64bits(t)
+		bytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(bytes, bits)
+		if !IsLittleEndian() {
+			bytes = Reverse(bytes)
 		}
-		if BitConverter.IsLittleEndian {
-			dBytes.Reverse()
+		writer.WriteByte(123)
+		writer.Write(bytes)
+	case float32: // TYPE 124: FLOAT32
+		bits := math.Float32bits(t)
+		bytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(bytes, bits)
+		if !IsLittleEndian() {
+			bytes = Reverse(bytes)
 		}
-		reader.WriteByte(123)
-		reader.Write(dBytes)
-		break
-		#endif // NETSTANDARD2_0
-	case float f: // TYPE 124: FLOAT32
-		#if NETSTANDARD2_0
-		var fBytes = BitConverter.GetBytes(f)
-		if BitConverter.IsLittleEndian {
-			Array.Reverse(fBytes)
-		}
-		reader.WriteByte(124)
-		reader.Write(fBytes, 0, fBytes.Length)
-		break
-		#elif
-		NETSTANDARD2_1
-		Span < byte > fBytes = stackalloc
-		byte[4]
-		if !BitConverter.TryWriteBytes(fBytes, f) {
-			throw
-			new
-			InvalidDataException("Unable to write a float value.")
-		}
-		if BitConverter.IsLittleEndian {
-			fBytes.Reverse()
-		}
-		reader.WriteByte(124)
-		reader.Write(fBytes)
-		break
-		#endif // NETSTANDARD2_0
-	case int i: // TYPE 125: INTEGER
-		reader.WriteByte(125)
-		reader.WriteVarInt(i)
-		break
-	case long l: // Special case: treat LONG as INTEGER.
-		reader.WriteByte(125)
-		reader.WriteVarInt(l)
-		break
-	case null: // TYPE 126: null
+		writer.WriteByte(124)
+		writer.Write(bytes)
+	case int: // TYPE 125: INTEGER
+		writer.WriteByte(125)
+		WriteVarInt(writer, t, false)
+	case int64: // Special case: treat LONG as INTEGER.
+		writer.WriteByte(125)
+		WriteVarInt(writer, int(t), false)
+	case nil: // TYPE 126: null
 		// TYPE 127: undefined
-		reader.WriteByte(126)
-		break
-	case byte[] ba: // TYPE 116: ArrayBuffer
-		reader.WriteByte(116)
-		reader.WriteVarUint8Array(ba)
-		break
-	case IDictionary dict: // TYPE 118: object (Dictionary<string, object>)
-		reader.WriteByte(118)
-		reader.WriteVarUint((uint)
-		dict.Count)
-		foreach(
-		var key in
-		dict.Keys)
-		{
-		reader.WriteVarString(key.ToString());
-		reader.WriteAny(dict[key]);
+		writer.WriteByte(126)
+	case []byte: // TYPE 116: ArrayBuffer
+		writer.WriteByte(116)
+		WriteVarUint8Array(writer, t)
+	case map[string]any: // TYPE 118: object (Dictionary<string, object>)
+		writer.WriteByte(118)
+		WriteVarUint(writer, uint(len(t)))
+		for key, value := range t {
+			WriteVarString(writer, key)
+			WriteAny(writer, value)
 		}
-		break
-	case ICollection col: // TYPE 117: Array
-		reader.WriteByte(117)
-		reader.WriteVarUint((uint)
-		col.Count)
-		foreach(
-		var item in
-		col)
-		{
-		reader.WriteAny(item);
+	case []any: // TYPE 117: Array
+		writer.WriteByte(117)
+		WriteVarUint(writer, uint(len(t)))
+		for _, item := range t {
+			WriteAny(writer, item)
 		}
-		break
+
 	default:
-		throw
-		new
-		NotSupportedException($"Unsupported object type: {o?.GetType()}")
+		// throw new NotSupportedException($"Unsupported object type: {o?.GetType()}")
+		fmt.Printf("Unsupported object type:%v", reflect.TypeOf(o))
 	}
-}
 }
