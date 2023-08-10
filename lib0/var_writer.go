@@ -76,6 +76,14 @@ func WriteVarInt(writer *bufio.Writer, num int, treatZeroAsNegative bool) {
 	}
 }
 
+func WriteVarInt2(writer *bufio.Writer, num int) {
+	for num > int(Bits7) {
+		writer.WriteByte((byte)(Bit8 | (Bits7 & uint(num))))
+		num >>= 7
+	}
+	writer.WriteByte((byte)(Bits7 & uint(num)))
+}
+
 // WriteVarString  Writes a variable length string.
 func WriteVarString(writer *bufio.Writer, str string) {
 	var data = []byte(str)
