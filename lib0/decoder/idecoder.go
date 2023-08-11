@@ -1,15 +1,20 @@
 package decoder
 
-import (
-	"bufio"
-	"io"
-)
-
-type IDecoder[v any] interface {
-	io.Reader
-	ReadV() v
+type IDecoder[v int | uint | uint64 | string | byte] interface {
+	Read() v
 }
 
-type BaseDecoder[v any] struct {
-	*bufio.Reader
+type AbstractDecoder struct {
+	LeaveOpen bool
+	Disposed  bool
+}
+
+func (a AbstractDecoder) CheckDisposed() {
+	if a.Disposed {
+		return
+	}
+}
+
+func (a AbstractDecoder) HasContent() bool {
+	return false
 }

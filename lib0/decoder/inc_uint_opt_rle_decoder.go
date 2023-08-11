@@ -17,9 +17,9 @@ type IncUintOptRleDecoder struct {
 	Disposed  bool
 }
 
-func (i IncUintOptRleDecoder) Read(p []byte) (n int, err error) {
-	if err = i.CheckDisposed(); err != nil {
-
+func (i IncUintOptRleDecoder) Read() uint {
+	if err := i.CheckDisposed(); err != nil {
+		return 0
 	}
 	if i.count == 0 {
 		value, sign, err := lib0.ReadVarInt(i.reader)
@@ -39,7 +39,7 @@ func (i IncUintOptRleDecoder) Read(p []byte) (n int, err error) {
 		}
 	}
 	i.count--
-	return int(i.state), nil
+	return uint(i.state)
 }
 
 func (i IncUintOptRleDecoder) CheckDisposed() error {

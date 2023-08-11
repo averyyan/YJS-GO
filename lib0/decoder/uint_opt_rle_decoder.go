@@ -3,37 +3,39 @@ package decoder
 import (
 	"bufio"
 	"encoding/binary"
+
+	"YJS-GO/lib0"
 )
 
+var _ IDecoder[uint64] = (*UintOptRleDecoder)(nil)
+
 type UintOptRleDecoder struct {
+	AbstractDecoder
 	Reader *bufio.Reader
 	State  uint64
 	Count  uint64
 }
 
 func (d UintOptRleDecoder) Read() uint64 {
-	// d.CheckDisposed()
+	d.CheckDisposed()
 
 	if d.Count == 0 {
 		binary.ReadVarint(d.Reader)
-		var (
-			value, sign
-		) = Stream.ReadVarInt()
-
+		var value, sign, err = lib0.ReadVarInt(d.Reader)
+		if err != nil {
+			return 0
+		}
 		// If the sign is negative, we read the count too; otherwise, count is 1.
-		bool
-		isNegative = sign < 0
+		isNegative := sign < 0
 		if isNegative {
-			_state = (uint)(-value)
-			_count = Stream.ReadVarUint() + 2
-		} else
-		{
-			_state = (uint)
-			value
-			_count = 1
+			d.State = uint64(-value)
+			d.Count = uint64(lib0.ReadVarUint(d.Reader) + 2)
+		} else {
+			d.State = uint64(value)
+			d.Count = 1
 		}
 	}
 
-	_count--
-	return _state
+	d.Count--
+	return d.State
 }

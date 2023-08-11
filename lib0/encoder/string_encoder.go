@@ -35,7 +35,8 @@ func (s *StringEncoder) Dispose(disposing bool) {
 	if !s.Disposed {
 		if disposing {
 			s.Sb.Reset()
-			s.LengthEncoder.Dispose()
+			// todo 数据流关闭
+			// s.LengthEncoder.Dispose()
 		}
 
 		s.Sb = nil

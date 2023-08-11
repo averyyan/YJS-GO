@@ -123,7 +123,7 @@ func ReadVarInt(reader *bufio.Reader) (uint, uint, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	var num uint = uint(r) & Bits6
+	var num = uint(r) & Bits6
 	var length = 6
 	var sign uint = 1
 	if uint(r)&Bit7 > 0 {

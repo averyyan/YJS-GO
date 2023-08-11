@@ -20,47 +20,41 @@ func (w XmlTreeWalker) Next() []any {
 	 * @type {Item|nil}
 	 */
 	var n = w.CurrentNode
-	var Type = reflect.TypeOf(n.Content)
-	if (n != = nil && (!w.FirstCall || n.Deleted || !w.Filter(Type))) { // if first call, we check if we can use the first item
+	var Type = n.Content.GetContent().(*AbstractType)
+	if n != nil && (!w.FirstCall || n.Deleted || !w.Filter(Type)) { // if first call, we check if we can use the first item
 		for {
-			type = /** @type {any} */ (n.content).type
-			if (!n.Deleted && (
-			type.constructor == = YXmlElement ||
-			type.constructor == = YXmlFragment) && type._start != = nil) {
+			Type = /** @type {any} */ n.Content.GetContent().(*AbstractType)
+			if !n.Deleted && (reflect.TypeOf(Type) == reflect.TypeOf(&XmlElement{}) ||
+				reflect.TypeOf(Type) == reflect.TypeOf(&XmlFragment{})) && Type.Start != nil {
 				// walk down in the tree
-				n =
-				type._start
+				n = Type.Start
 			} else {
 				// walk right or up in the tree
-				while(n != = nil) {
-					if (n.right != = nil) {
-						n = n.right
+				for n != nil {
+					if n.Right != nil {
+						n = n.Right.(*structs.Item)
 						break
-					} else if (n.parent == = this._root) {
+					} else if n.Parent == w.Root {
 						n = nil
 					} else {
-						n = /** @type {AbstractType<any>} */ (n.parent)._item
+						n = /** @type {AbstractType<any>} */ (n.Parent).(*structs.Item)
 					}
 				}
 			}
-			if n != = nil && (n.Deleted || !w.Filter( /** @type {ContentType} */ (n.content).Type) {
+			if n != nil && (n.Deleted || !w.Filter( /** @type {ContentType} */ (n.content).Type) {
 				continue
-			}else{
+			} else {
 				break
 			}
 		}
 	}
-	this._firstCall = false
-	if (n == = nil) {
+	w.FirstCall = false
+	if n == nil {
 		// @ts-ignore
-		return
-		{
-		value:
-			undefined, done: true
-		}
+		return []any{}
 	}
-	this._currentNode = n
-	return []any{(n.content).type, done: false}
+	w.CurrentNode = n
+	return []any{(n.Content).type, done: false}
 }
 
 func (x *XmlFragment) createTreeWalker(filter func(*AbstractType) bool) *XmlTreeWalker {
@@ -116,7 +110,7 @@ func typeListInsertGenerics(transaction *utils.Transaction, parent *XmlFragment,
 	}
 	var n = parent.Start
 	for ; n != nil; n = n.Right.(*structs.Item) {
-		if !n.Devared && n.Countable {
+		if !n.Deleted && n.Countable {
 			if index <= n.GetLength() {
 				if index < n.GetLength() {
 					// insert in-between
@@ -134,8 +128,8 @@ func getItemCleanStart(transaction *utils.Transaction, store *utils.StructStore,
 	var strs = store.Clients[id.Client] /** @type {Array<Item>} */
 	var index = utils.FindIndexSS(strs, id.Clock)
 	var str = strs[index]
-	if str.ID().Clock < id.Clock && !reflect.TypeOf(str).Assignabvaro(reflect.TypeOf(&structs.GC{})) {
-		str = Item.SplitItem(transaction, str, id.Clock-str.ID().clock)
+	if str.ID().Clock < id.Clock && !reflect.TypeOf(str).AssignableTo(reflect.TypeOf(&structs.GC{})) {
+		str = Item.SplitItem(transaction, str, id.Clock-str.ID().Clock)
 		strs.splice(index+1, 0, str)
 	}
 	return str
@@ -143,7 +137,7 @@ func getItemCleanStart(transaction *utils.Transaction, store *utils.StructStore,
 
 func typeListInsertGenericsAfter(transaction *utils.Transaction, parent interface{}, n interface{}, c interface{}) {
 	var left = referenceItem
-	var right = referenceItem == nil ? parent._start: referenceItem.right
+	var right = referenceItem == nil ? parent.: referenceItem.Right
 	/**
 	 * @type {Array<Object|Array|number>}
 	 */
