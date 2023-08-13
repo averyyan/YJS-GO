@@ -1,6 +1,8 @@
 package types
 
 import (
+	"reflect"
+
 	"YJS-GO/structs"
 	"YJS-GO/structs/content"
 	"YJS-GO/utils"
@@ -10,7 +12,18 @@ const (
 	Insert = iota
 	Delete
 	Retain
+
+	Added   = YTextChangeType("added")
+	Removed = YTextChangeType("Removed")
 )
+
+type YTextChangeType string
+
+type YTextChangeAttributes struct {
+	Type  YTextChangeType
+	User  int
+	State YTextChangeType
+}
 
 type YText struct {
 	YArrayBase
@@ -23,7 +36,7 @@ type ItemTextListPosition struct {
 	CurrentAttributes map[string]any
 }
 
-func UpdateCurrentAttributes(attributes map[string]any, format content.Format) {
+func UpdateCurrentAttributes(attributes map[string]any, format *content.Format) {
 	if format.Value == nil {
 		delete(attributes, format.Key)
 	} else {
@@ -239,7 +252,7 @@ func (yte YTextEvent) GetDelta() []*utils.Delta {
 						if action == Insert {
 							addOp()
 						}
-						UpdateCurrentAttributes(currentAttributes, item.Content.(content.Format))
+						UpdateCurrentAttributes(currentAttributes, item.Content.(*content.Format))
 					}
 					break
 				}
@@ -277,13 +290,90 @@ func (p ItemTextListPosition) Forward() {
 		break
 	case content.Format:
 		if !p.Right.Deleted {
-			UpdateCurrentAttributes(p.CurrentAttributes, cf)
+			UpdateCurrentAttributes(p.CurrentAttributes, &cf)
 		}
 		break
 	}
 
 	p.Left = p.Right
 	p.Right = p.Right.Right.(*structs.Item)
+}
+func (p ItemTextListPosition) FindNextPosition(transaction *utils.Transaction, count uint64) {
+	for p.Right != nil && count > 0 {
+		switch t := p.Right.Content.(type) {
+		case content.Embed:
+		case content.String:
+			if !p.Right.Deleted {
+				if count < p.Right.Length {
+					// Split p.Right.
+					transaction.Doc.Store.GetItemCleanStart(transaction,
+						&utils.ID{Client: p.Right.Id.Client, Clock: p.Right.Id.Clock + count})
+				}
+
+				p.Index += p.Right.Length
+				count -= p.Right.Length
+			}
+			break
+		case content.Format:
+			if !p.Right.Deleted {
+				UpdateCurrentAttributes(p.CurrentAttributes, &t)
+			}
+			break
+		}
+
+		p.Left = p.Right
+		p.Right = p.Right.Right.(*structs.Item)
+		// We don't forward() because that would halve the performance because we already do the checks above.
+	}
+}
+
+// InsertNegatedAttributes Negate applied formats.
+func (p ItemTextListPosition) InsertNegatedAttributes(transaction *utils.Transaction, parent AbstractType, negatedAttributes map[string]any) {
+	// Check if we really need to remove attributes.
+	for p.Right != nil && (p.Right.Deleted || rightIsInNegatedAttributes(p.Right.Content, negatedAttributes)) {
+		if !p.Right.Deleted {
+			delete(negatedAttributes, (p.Right.Content).(*content.Format).Key)
+		}
+		p.Forward()
+	}
+
+	var doc = transaction.Doc
+	var ownClientId = doc.ClientId
+	var left = p.Left
+	var right = p.Right
+
+	for k, v := range negatedAttributes {
+
+		left = structs.NewItem(&utils.ID{Client: ownClientId, Clock: doc.Store.GetState(ownClientId)}, left, left.LastId, right,
+			right.Id,
+			parent,
+			"", content.NewFormat(k, v))
+		left.Integrate(transaction, 0)
+
+		p.CurrentAttributes[k] = v
+		UpdateCurrentAttributes(p.CurrentAttributes, left.Content.(*content.Format))
+	}
+}
+
+func rightIsInNegatedAttributes(rightContent any, negatedAttributes map[string]any) bool {
+	if reflect.TypeOf(rightContent) == reflect.TypeOf(&content.Format{}) {
+		cf := rightContent.(*content.Format)
+		if _, ok := negatedAttributes[cf.Key]; ok && utils.EqualAttrs(negatedAttributes[cf.Key], cf.Value) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p ItemTextListPosition) MinimizeAttributeChanges(attributes map[string]any) {
+	// Go right while attributes[right.Key] == right.Value (or right is deleted).
+	for p.Right != nil {
+		if p.Right.Deleted || rightIsInNegatedAttributes(p.Right.Content, attributes) {
+			p.Forward()
+		} else {
+			break
+		}
+	}
 }
 
 func ReadText(decoder utils.IUpdateDecoder) *YText {
