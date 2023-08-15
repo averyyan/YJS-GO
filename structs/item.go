@@ -20,6 +20,11 @@ type InfoEnum int
 
 var _ IAbstractStruct = (*Item)(nil)
 
+type ItemAbstract interface {
+	Item
+	IAbstractStruct
+}
+
 type Item struct {
 	Id          *utils.ID
 	Length      uint64

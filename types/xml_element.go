@@ -19,13 +19,13 @@ func NewXmlElement(name string) *XmlElement {
 	return t
 }
 
-func (e XmlElement) nextSibling() *structs.Item {
+func (e XmlElement) nextSibling() XmlFragment {
 	var t *structs.Item
 	if e.Item != nil {
 		t = e.Item.Next.(*structs.Item)
 	}
 	if t != nil {
-		return t.Content.
+		return t.Content
 	}
 	return nil
 }

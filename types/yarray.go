@@ -8,6 +8,8 @@ import (
 	"github.com/uber-go/atomic"
 )
 
+var _ IAbstractType = (*YArray)(nil)
+
 type YArray struct {
 	AbstractType
 }
@@ -131,4 +133,12 @@ func minSearchMarks(asm []*ArraySearchMarker) *ArraySearchMarker {
 
 func ReadArr(decoder utils.IUpdateDecoder) *YArray {
 	return &YArray{}
+}
+func (y YArray) Write(encoder utils.IUpdateEncoder) {
+	encoder.WriteTypeRef(YArrayRefId)
+}
+
+func (y YArray) CallObserver(transaction Transaction, parentSubs map[string]struct{}) {
+	y.CallObserver(transaction, parentSubs)
+	y.CallTypeObservers(transaction, &ArrayEvent{y, transaction})
 }

@@ -218,7 +218,7 @@ func ReadAny(reader *bufio.Reader) any {
 	return nil
 }
 
-// Reads a byte from the reader and advances the position within the reader by one byte.
+// ReadByte Reads a byte from the reader and advances the position within the reader by one byte.
 // <exception cref="EndOfreaderException">End of reader reached.</exception>
 func ReadByte(reader *bufio.Reader) byte {
 	v, err := reader.ReadByte()
@@ -260,4 +260,9 @@ func Reverse(bytes []byte) []byte {
 		bytes[i], bytes[j] = bytes[j], bytes[i]
 	}
 	return bytes
+}
+
+func ReadVarUint8ArrayAsStream(reader *bufio.Reader) *bufio.Reader {
+	var data = ReadVarUint8Array(reader)
+	return bufio.NewReader(bytes.NewReader(data))
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 
+	"YJS-GO/lib0"
 	"YJS-GO/lib0/decoder"
 )
 
@@ -62,20 +63,20 @@ func NewUpdateDecoderV2(reader io.Reader) *UpdateDecoderV2 {
 	return &UpdateDecoderV2{
 		DSDecoderV2:       DSDecoderV2{reader: a},
 		Keys:              []string{},
-		KeyClockDecoder:   decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		ClientDecoder:     decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		LeftClockDecoder:  decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		RightClockDecoder: decoder.IntDiffOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		InfoDecoder:       decoder.RleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		StringDecoder:     decoder.StringDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		ParentInfoDecoder: decoder.RleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		TypeRefDecoder:    decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
-		LengthDecoder:     decoder.UintOptRleDecoder{Reader: decoder.ReadVarUint8ArrayAsStream(a)},
+		KeyClockDecoder:   decoder.IntDiffOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		ClientDecoder:     decoder.UintOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		LeftClockDecoder:  decoder.IntDiffOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		RightClockDecoder: decoder.IntDiffOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		InfoDecoder:       decoder.RleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		StringDecoder:     decoder.StringDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		ParentInfoDecoder: decoder.RleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		TypeRefDecoder:    decoder.UintOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
+		LengthDecoder:     decoder.UintOptRleDecoder{Reader: lib0.ReadVarUint8ArrayAsStream(a)},
 	}
 }
 
 func (u *UpdateDecoderV2) ReadLeftId() *ID {
-	return &ID{u.ClientDecoder.Read(), u.LeftClockDecoder.Read()}
+	return &ID{u.ClientDecoder.Read(), uint64(u.LeftClockDecoder.Read())}
 }
 
 func (u *UpdateDecoderV2) ReadRightId() *ID {
