@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 
+	"YJS-GO/lib0"
 	"YJS-GO/structs"
 	"YJS-GO/types"
 )
@@ -249,4 +250,32 @@ func TryToMergeWithLeft(strs []structs.IAbstractStruct, pos int) {
 			}
 		}
 	}
+}
+
+func ReadDeleteSet(decoder IDSDecoder) *DeleteSet {
+	var ds = &DeleteSet{
+		Clients: map[uint64][]*DeleteItem{},
+	}
+	var numClients = lib0.ReadVarUint(decoder.Reader())
+	if numClients < 0 {
+		return nil
+	}
+	for i := 0; i < int(numClients); i++ {
+		decoder.ResetDsCurVal()
+		var client = lib0.ReadVarUint(decoder.Reader())
+		var numberOfDeletes = lib0.ReadVarUint(decoder.Reader())
+		if numberOfDeletes > 0 {
+			if dsField, ok := ds.Clients[uint64(client)]; !ok {
+				dsField = make([]*DeleteItem, numberOfDeletes)
+				ds.Clients[uint64(client)] = dsField
+			} else {
+				for i = 0; i < int(numberOfDeletes); i++ {
+					var deleteItem = &DeleteItem{decoder.ReadDsClock(), decoder.ReadDsLength()}
+					dsField = append(dsField, deleteItem)
+				}
+			}
+		}
+	}
+
+	return ds
 }

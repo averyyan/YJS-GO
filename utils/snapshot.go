@@ -1,13 +1,16 @@
 package utils
 
-import "encoding/binary"
+import (
+	"bufio"
+	"encoding/binary"
+)
 
 type Snapshot struct {
-	DeleteSet   DeleteSet
+	DeleteSet   *DeleteSet
 	StateVector map[uint64]uint64
 }
 
-func NewSnapshot(ds DeleteSet, stateMap map[uint64]uint64) *Snapshot {
+func NewSnapshot(ds *DeleteSet, stateMap map[uint64]uint64) *Snapshot {
 	return &Snapshot{
 		DeleteSet:   ds,
 		StateVector: stateMap,
@@ -54,11 +57,19 @@ func (s *Snapshot) Equal(other *Snapshot) bool {
 }
 
 func (s *Snapshot) EncodeSnapshotV2() []byte {
-	var encoder = NewDsDecoderV2WithEmpty()
+	var encoder = NewDsEncoderV2()
 
 	s.DeleteSet.Write(encoder)
 	WriteStateVector(encoder, s.StateVector)
 	return encoder.ToArray()
+
+}
+
+func (s *Snapshot) DecodeSnapshot(reader *bufio.Reader) *Snapshot {
+	var decoder = NewDsDecoderV2(reader)
+	var ds = ReadDeleteSet(decoder)
+	var sv = ReadStateVector(decoder)
+	return NewSnapshot(ds, sv)
 
 }
 

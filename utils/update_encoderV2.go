@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 
 	"YJS-GO/lib0/encoder"
 )
@@ -136,4 +137,8 @@ func (u UpdateEncoderV2) WriteKey(key string) {
 func (u UpdateEncoderV2) WriteJson(T any) {
 	// TODO implement me
 	panic("implement me")
+}
+
+func NewDsEncoderV2() *DSEncoderV2 {
+	return &DSEncoderV2{writer: bufio.NewWriter(bytes.NewBuffer(oneMBytes))}
 }
