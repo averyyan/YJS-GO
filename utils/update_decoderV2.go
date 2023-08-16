@@ -2,16 +2,29 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 
 	"YJS-GO/lib0"
 	"YJS-GO/lib0/decoder"
 )
 
+var (
+	oneMBytes     = make([]byte, 1*1024*1024)
+	tenMBytes     = make([]byte, 10*1024*1024)
+	hundredMBytes = make([]byte, 100*1024*1024)
+)
+
 var a IDSDecoder = (*DSDecoderV2)(nil)
 
 type DSDecoderV2 struct {
-	reader *bufio.Reader
+	reader   *bufio.Reader
+	DsCurVal uint64
+}
+
+func (d *DSDecoderV2) ToArray() []byte {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (d *DSDecoderV2) Reader() *bufio.Reader {
@@ -29,12 +42,15 @@ func (d *DSDecoderV2) ReadDsClock() uint64 {
 }
 
 func (d *DSDecoderV2) ResetDsCurVal() {
-	// TODO implement me
-	panic("implement me")
+	d.DsCurVal = 0
 }
 
 func NewDsDecoderV2(reader io.Reader) *DSDecoderV2 {
 	return &DSDecoderV2{reader: bufio.NewReader(reader)}
+}
+
+func NewDsDecoderV2WithEmpty() *DSDecoderV2 {
+	return &DSDecoderV2{reader: bufio.NewReader(bytes.NewReader(oneMBytes))}
 }
 
 var _ IUpdateDecoder = (*UpdateDecoderV2)(nil)

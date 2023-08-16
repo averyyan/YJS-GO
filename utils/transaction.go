@@ -28,175 +28,6 @@ type Transaction struct {
 	SubdocsLoaded      map[*YDoc]struct{}
 }
 
-func CleanupTransactions(transactionCleanups []*Transaction, i int) {
-	if i < len(transactionCleanups) {
-		var transaction = transactionCleanups[i]
-		var doc = transaction.Doc
-		var store = doc.Store
-		var ds = transaction.DeleteSet
-		var mergeStructs = transaction.MergeStructs
-		var actions []func()
-
-		ds.SortAndMergeDeleteSet()
-		transaction.AfterState = store.GetStateVector()
-		doc.Transaction = nil
-
-		actions = append(actions, func() {
-			doc.BeforeObserverCalls(transaction)
-		})
-		// actions.Add(() =>
-		// {
-		// 	doc.InvokeOnBeforeObserverCalls(transaction)
-		// })
-		actions = append(actions, func() {
-			for itemType, subs := range transaction.Changed {
-				if itemType.(*types.AbstractType).Item == nil || !itemType.(*types.AbstractType).Item.Deleted {
-					itemType.(*types.AbstractType).CallObserver(transaction, subs)
-				}
-			}
-		})
-		actions = append(actions, func() {
-			// Deep observe events.
-			for Type, events := range transaction.ChangedParentTypes {
-				if Type.Item == nil || !Type.Item.Deleted {
-					var sortedEvents []*YEvent
-					for _, event := range events {
-						if event.Target.Item == nil || !event.Target.Item.Deleted {
-							event.CurrentTarget = Type
-						}
-						sortedEvents = append(sortedEvents, event)
-					}
-					// Sort events by path length so that top-level events are fired first.
-					sort.SliceStable(sortedEvents, func(i, j int) bool {
-						return len(sortedEvents[i].Path) < len(sortedEvents[j].Path)
-					})
-					if len(sortedEvents) <= 0 {
-						continue
-					}
-					actions = append(actions, func() {
-						Type.CallDeepEventHandlerListeners(sortedEvents, transaction)
-					})
-				}
-			}
-		})
-		actions = append(actions, func() {
-			doc.AfterTransaction(transaction)
-		})
-		for _, action := range actions {
-			action()
-		}
-
-		// Replace deleted items with ItemDeleted / GC.
-		// This is where content is actually removed from the Yjs Doc.
-		if doc.GC {
-			ds.TryGcDeleteSet(store, doc.GCFilter)
-		}
-		ds.TryMergeDeleteSet(store)
-
-		// On all affected store.clients props, try to merge.
-		for client, clock := range transaction.AfterState {
-			beforeClock, ok := transaction.BeforeState[client]
-			if !ok {
-				beforeClock = 0
-			}
-
-			if beforeClock != clock {
-				var structs = store.Clients[client]
-				var firstChangePos = math.Max(float64(FindIndexSS(structs, beforeClock)), 1)
-				for j := len(structs) - 1; j >= int(firstChangePos); j-- {
-					TryToMergeWithLeft(structs, j)
-				}
-			}
-		}
-		// Try to merge mergeStructs.
-		// TODO: It makes more sense to transform mergeStructs to a DS, sort it, and merge from right to left
-		//       but at the moment DS does not handle duplicates.
-		for j := 0; j < len(mergeStructs); j++ {
-			var client, clock = mergeStructs[j].ID().Client, mergeStructs[j].ID().Clock
-			var structs = store.Clients[client]
-			var replacedStructPos = int(FindIndexSS(structs, clock))
-			if replacedStructPos+1 < len(structs) {
-				TryToMergeWithLeft(structs, replacedStructPos+1)
-			}
-			if replacedStructPos > 0 {
-				TryToMergeWithLeft(structs, replacedStructPos)
-			}
-		}
-
-		if !transaction.Local {
-			afterClock, ok := transaction.AfterState[doc.ClientId]
-			if !ok {
-				afterClock = -1
-			}
-
-			beforeClock, ok := transaction.BeforeState[doc.ClientId]
-			if !ok {
-				beforeClock = -1
-			}
-
-			if afterClock != beforeClock {
-				doc.ClientId = GenerateNewClientId()
-				// Debug.WriteLine($"{nameof(Transaction)}: Changed the client-id because another client seems to be using it.");
-			}
-		}
-
-		// @todo: Merge all the transactions into one and provide send the data as a single update message.
-		if doc.AfterTransaction != nil {
-			doc.AfterTransaction(transaction)
-		}
-		if doc.UpdateV2 != nil {
-			doc.UpdateV2(nil, nil, transaction)
-		}
-
-		for subDoc := range transaction.SubdocsAdded {
-			doc.Subdocs[subDoc] = struct{}{}
-		}
-
-		for subDoc := range transaction.SubdocsRemoved {
-			delete(doc.Subdocs, subDoc)
-		}
-		if doc.SubdocsChanged != nil {
-			doc.SubdocsChanged(transaction.SubdocsLoaded, transaction.SubdocsAdded, transaction.SubdocsRemoved)
-		}
-		for subDoc := range transaction.SubdocsRemoved {
-			subDoc.Destroyed()
-		}
-
-		if len(transactionCleanups) <= i+1 {
-			doc.TransactionCleanups = doc.TransactionCleanups[:0]
-			if doc.AfterAllTransactions != nil {
-				doc.AfterAllTransactions(transactionCleanups)
-			}
-		} else {
-			CleanupTransactions(transactionCleanups, i+1)
-		}
-
-	}
-}
-
-func NewTransaction(doc *YDoc, origin interface{}, local ...bool) *Transaction {
-	t := &Transaction{
-		Doc:                doc,
-		DeleteSet:          &DeleteSet{},
-		BeforeState:        doc.Store.GetStateVector(),
-		AfterState:         map[uint64]uint64{},
-		Changed:            map[any]map[string]struct{}{},
-		ChangedParentTypes: map[*types.AbstractType][]*YEvent{},
-		MergeStructs:       []structs.IAbstractStruct{},
-		Meta:               map[string]any{},
-		SubdocsAdded:       map[*YDoc]struct{}{},
-		SubdocsRemoved:     map[*YDoc]struct{}{},
-		SubdocsLoaded:      map[*YDoc]struct{}{},
-		Origin:             origin,
-	}
-	if len(local) == 0 {
-		t.Local = true
-	} else {
-		t.Local = false
-	}
-	return t
-}
-
 func (t *Transaction) AddChangedTypeToTransaction(ty *types.AbstractType, parentSub string) {
 	var item = ty.Item
 
@@ -324,4 +155,218 @@ func (t *Transaction) RedoItem(item *structs.Item, redoItems map[*structs.Item]s
 
 	return redoneItem
 
+}
+
+func CleanupTransactions(transactionCleanups []*Transaction, i int) {
+	if i >= len(transactionCleanups) {
+		return
+	}
+	var transaction = transactionCleanups[i]
+	var doc = transaction.Doc
+	var store = doc.Store
+	var ds = transaction.DeleteSet
+	var mergeStructs = transaction.MergeStructs
+	var actions []func()
+
+	ds.SortAndMergeDeleteSet()
+	transaction.AfterState = store.GetStateVector()
+	doc.Transaction = nil
+
+	actions = append(actions, func() {
+		doc.BeforeObserverCalls(transaction)
+	})
+	// actions.Add(() =>
+	// {
+	// 	doc.InvokeOnBeforeObserverCalls(transaction)
+	// })
+	actions = append(actions, func() {
+		for itemType, subs := range transaction.Changed {
+			if itemType.(*types.AbstractType).Item == nil || !itemType.(*types.AbstractType).Item.Deleted {
+				itemType.(*types.AbstractType).CallObserver(transaction, subs)
+			}
+		}
+	})
+	actions = append(actions, func() {
+		// Deep observe events.
+		for Type, events := range transaction.ChangedParentTypes {
+			if Type.Item == nil || !Type.Item.Deleted {
+				var sortedEvents []*YEvent
+				for _, event := range events {
+					if event.Target.Item == nil || !event.Target.Item.Deleted {
+						event.CurrentTarget = Type
+					}
+					sortedEvents = append(sortedEvents, event)
+				}
+				// Sort events by path length so that top-level events are fired first.
+				sort.SliceStable(sortedEvents, func(i, j int) bool {
+					return len(sortedEvents[i].Path) < len(sortedEvents[j].Path)
+				})
+				if len(sortedEvents) <= 0 {
+					continue
+				}
+				actions = append(actions, func() {
+					Type.CallDeepEventHandlerListeners(sortedEvents, transaction)
+				})
+			}
+		}
+	})
+	actions = append(actions, func() {
+		doc.AfterTransaction(transaction)
+	})
+	for _, action := range actions {
+		SafeAsyncExe(action)
+	}
+
+	// Replace deleted items with ItemDeleted / GC.
+	// This is where content is actually removed from the Yjs Doc.
+	if doc.GC {
+		ds.TryGcDeleteSet(store, doc.GCFilter)
+	}
+	ds.TryMergeDeleteSet(store)
+
+	// On all affected store.clients props, try to merge.
+	for client, clock := range transaction.AfterState {
+		beforeClock, ok := transaction.BeforeState[client]
+		if !ok {
+			beforeClock = 0
+		}
+
+		if beforeClock != clock {
+			var structs = store.Clients[client]
+			var firstChangePos = math.Max(float64(FindIndexSS(structs, beforeClock)), 1)
+			for j := len(structs) - 1; j >= int(firstChangePos); j-- {
+				TryToMergeWithLeft(structs, j)
+			}
+		}
+	}
+	// Try to merge mergeStructs.
+	// TODO: It makes more sense to transform mergeStructs to a DS, sort it, and merge from right to left
+	//       but at the moment DS does not handle duplicates.
+	for j := 0; j < len(mergeStructs); j++ {
+		var client, clock = mergeStructs[j].ID().Client, mergeStructs[j].ID().Clock
+		var structs = store.Clients[client]
+		var replacedStructPos = int(FindIndexSS(structs, clock))
+		if replacedStructPos+1 < len(structs) {
+			TryToMergeWithLeft(structs, replacedStructPos+1)
+		}
+		if replacedStructPos > 0 {
+			TryToMergeWithLeft(structs, replacedStructPos)
+		}
+	}
+
+	if !transaction.Local {
+		afterClock, ok := transaction.AfterState[doc.ClientId]
+		if !ok {
+			afterClock = -1
+		}
+
+		beforeClock, ok := transaction.BeforeState[doc.ClientId]
+		if !ok {
+			beforeClock = -1
+		}
+
+		if afterClock != beforeClock {
+			doc.ClientId = GenerateNewClientId()
+			// Debug.WriteLine($"{nameof(Transaction)}: Changed the client-id because another client seems to be using it.");
+		}
+	}
+
+	// @todo: Merge all the transactions into one and provide send the data as a single update message.
+	if doc.AfterTransaction != nil {
+		doc.AfterTransaction(transaction)
+	}
+	if doc.UpdateV2 != nil {
+		doc.UpdateV2(nil, nil, transaction)
+	}
+
+	for subDoc := range transaction.SubdocsAdded {
+		doc.Subdocs[subDoc] = struct{}{}
+	}
+
+	for subDoc := range transaction.SubdocsRemoved {
+		delete(doc.Subdocs, subDoc)
+	}
+	if doc.SubdocsChanged != nil {
+		doc.SubdocsChanged(transaction.SubdocsLoaded, transaction.SubdocsAdded, transaction.SubdocsRemoved)
+	}
+	for subDoc := range transaction.SubdocsRemoved {
+		subDoc.Destroyed()
+	}
+
+	if len(transactionCleanups) <= i+1 {
+		doc.TransactionCleanups = doc.TransactionCleanups[:0]
+		if doc.AfterAllTransactions != nil {
+			doc.AfterAllTransactions(transactionCleanups)
+		}
+		return
+	}
+	CleanupTransactions(transactionCleanups, i+1)
+}
+
+func NewTransaction(doc *YDoc, origin interface{}, local ...bool) *Transaction {
+	t := &Transaction{
+		Doc:                doc,
+		DeleteSet:          &DeleteSet{},
+		BeforeState:        doc.Store.GetStateVector(),
+		AfterState:         map[uint64]uint64{},
+		Changed:            map[any]map[string]struct{}{},
+		ChangedParentTypes: map[*types.AbstractType][]*YEvent{},
+		MergeStructs:       []structs.IAbstractStruct{},
+		Meta:               map[string]any{},
+		SubdocsAdded:       map[*YDoc]struct{}{},
+		SubdocsRemoved:     map[*YDoc]struct{}{},
+		SubdocsLoaded:      map[*YDoc]struct{}{},
+		Origin:             origin,
+	}
+	if len(local) == 0 {
+		t.Local = true
+	} else {
+		t.Local = false
+	}
+	return t
+}
+
+func SplitSnapshotAffectedStructs(transaction *Transaction, snapshot *Snapshot) {
+	var (
+		metaObj any
+		ok      bool
+	)
+	if metaObj, ok = transaction.Meta["splitSnapshotAffectedStructs"]; !ok {
+		metaObj = map[*Snapshot]struct{}{}
+		transaction.Meta["splitSnapshotAffectedStructs"] = metaObj
+	}
+
+	var meta = metaObj.(map[*Snapshot]struct{})
+	var store = transaction.Doc.Store
+
+	// Check if we already split for this snapshot.
+	if _, exist := meta[snapshot]; !exist {
+		for client, clock := range snapshot.StateVector {
+			if clock < store.GetState(client) {
+				store.GetItemCleanStart(transaction, &ID{client, clock})
+			}
+		}
+
+		snapshot.DeleteSet.IterateDeletedStructs(transaction, func(abstractStruct structs.IAbstractStruct) bool {
+			return true
+		})
+		meta[snapshot] = struct{}{}
+	}
+}
+
+// WriteUpdateMessageFromTransaction Whether the data was written.
+func (t *Transaction) WriteUpdateMessageFromTransaction(encoder IUpdateEncoder) bool {
+	var ok bool
+	for k, v := range t.AfterState {
+		if t.BeforeState[k] == v {
+			ok = true
+		}
+	}
+	if len(t.DeleteSet.Clients) == 0 && !ok {
+		return false
+	}
+	t.DeleteSet.SortAndMergeDeleteSet()
+	WriteClientsStructs(encoder, t.Doc.Store, t.BeforeState)
+	t.DeleteSet.Write(encoder)
+	return true
 }

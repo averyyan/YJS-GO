@@ -54,7 +54,12 @@ func (s *Snapshot) Equal(other *Snapshot) bool {
 }
 
 func (s *Snapshot) EncodeSnapshotV2() []byte {
-	return nil
+	var encoder = NewDsDecoderV2WithEmpty()
+
+	s.DeleteSet.Write(encoder)
+	WriteStateVector(encoder, s.StateVector)
+	return encoder.ToArray()
+
 }
 
 func (s *Snapshot) RestoreDocument(originDoc *YDoc, opts *YDocOptions) *YDoc {

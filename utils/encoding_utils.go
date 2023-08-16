@@ -22,7 +22,7 @@ import (
 // 7: Type content.
 // 8: Any content.
 // 9: Doc content.
-func ReadItemContent(decoder IUpdateDecoder, info byte) (structs.IContent, error) {
+func ReadItemContent(decoder IUpdateDecoder, info byte) (structs.IContentExt, error) {
 	switch uint(info) & lib0.Bits5 {
 	case 0: // GC
 		return nil, errors.New("GC is not Itemcontent.")

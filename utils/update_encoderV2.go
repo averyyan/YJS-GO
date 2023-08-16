@@ -9,7 +9,35 @@ import (
 var _ IDSEncoder = (*DSEncoderV2)(nil)
 
 type DSEncoderV2 struct {
-	IDSEncoder
+	writer *bufio.Writer
+}
+
+func (v DSEncoderV2) ToArray() []byte {
+	var b []byte
+	_, err := v.RestWriter().Read(b)
+	if err != nil {
+		return []byte{}
+	}
+	return b
+}
+func (v DSEncoderV2) RestWriter() *bufio.ReadWriter {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (v DSEncoderV2) WriteDsLength(length uint64) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (v DSEncoderV2) WriteDsClock(clock uint64) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (v DSEncoderV2) ResetDsCurVal() {
+	// TODO implement me
+	panic("implement me")
 }
 
 type UpdateEncoderV2 struct {
@@ -108,13 +136,4 @@ func (u UpdateEncoderV2) WriteKey(key string) {
 func (u UpdateEncoderV2) WriteJson(T any) {
 	// TODO implement me
 	panic("implement me")
-}
-
-func (v DSEncoderV2) ToArray() []byte {
-	var b []byte
-	_, err := v.RestWriter().Read(b)
-	if err != nil {
-		return []byte{}
-	}
-	return b
 }
